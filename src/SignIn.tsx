@@ -1,14 +1,32 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-const SignIn: React.FC = () => {
+type User = { name: string; email: string; password: string };
+
+interface SignInProps {
+  onLogin?: (name: string) => void; // Optional prop to match Auth.tsx
+}
+
+const SignIn: React.FC<SignInProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: call your login API
-    alert(`Signing in with:\nEmail: ${email}\nPassword: ${password}`);
+    const storedUsers: User[] = JSON.parse(localStorage.getItem('vyapariUsers') || '[]');
+    const found = storedUsers.find(u => u.email === email);
+    if (!found) {
+      alert('No account found.');
+      return;
+    }
+    if (found.password !== password) {
+      alert('Incorrect password.');
+      return;
+    }
+
+    if (onLogin) onLogin(found.name);
+    navigate('/Dashboard');
   };
 
   return (
@@ -27,7 +45,6 @@ const SignIn: React.FC = () => {
               required
             />
           </div>
-
           <div className="mb-4">
             <label className="form-label fw-medium">Password</label>
             <input
@@ -40,12 +57,10 @@ const SignIn: React.FC = () => {
               minLength={6}
             />
           </div>
-
           <button type="submit" className="btn btn-primary w-100">
             Sign In
           </button>
         </form>
-
         <div className="text-center mt-3">
           <span>Don't have an account? </span>
           <Link to="/signup">Sign Up</Link>
