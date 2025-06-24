@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Auth from './Auth';
 import Dashboard from './components/Dashboard';
+import TransactionReport from './pages/TransactionReport';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

@@ -1,10 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const DashboardHome: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="p-4">
-      <h1 className="text-success mb-4">Welcome, fluffy 😊</h1>
-      
       <div className="d-flex gap-4 mb-4">
         <div className="card shadow-sm" style={{ width: '250px' }}>
           <div className="card-body">
@@ -20,8 +21,11 @@ const DashboardHome: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      <button className="btn btn-primary">View Report</button>
+
+      {/* ✅ THIS is the working button */}
+      <button className="btn btn-primary" onClick={() => navigate('/dashboard/transactions')}>
+        View Report
+      </button>
     </div>
   );
 };

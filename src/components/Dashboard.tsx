@@ -2,6 +2,8 @@ import React from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import DashboardHome from '../pages/DashboardHome';
 import SuppliersPage from '../pages/SuppliersPage';
+import TransactionReport from '../pages/TransactionReport';
+
 // Import other pages similarly
 
 const Dashboard: React.FC = () => {
@@ -93,6 +95,8 @@ const Dashboard: React.FC = () => {
           <Route path="expenses" element={<div><h2>Expenses</h2></div>} />
           <Route path="cashbook" element={<div><h2>Cashbook</h2></div>} />
           <Route path="reports" element={<div><h2>Reports</h2></div>} />
+          <Route path="transactions" element={<TransactionReport />} />
+
         </Routes>
       </div>
     </div>
