@@ -1,0 +1,55 @@
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+// import { Card } from '@/components/ui/card';
+import { 
+  LayoutDashboard, 
+  Users, 
+  Truck, 
+  Receipt, 
+  CreditCard, 
+  FileText, 
+  Activity 
+} from 'lucide-react';
+
+const Navigation = () => {
+  const location = useLocation();
+
+  const navItems = [
+    { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/customers', label: 'Customers', icon: Users },
+    { path: '/suppliers', label: 'Suppliers', icon: Truck },
+    { path: '/expenses', label: 'Expenses', icon: Receipt },
+    { path: '/cashbook', label: 'Cashbook', icon: CreditCard },
+    { path: '/reports', label: 'Reports', icon: FileText },
+    // ← Added this line for Transactions
+    { path: '/transactions', label: 'Transactions', icon: Activity },
+  ];
+
+  return (
+    <Card className="bg-white shadow-sm border-0 rounded-lg overflow-hidden">
+      <div className="flex flex-wrap gap-1 p-2">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.path;
+          
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span className="hidden sm:inline">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
+
+export default Navigation;

@@ -4,12 +4,10 @@ import DashboardHome from '../pages/DashboardHome';
 import SuppliersPage from '../pages/SuppliersPage';
 import TransactionReport from '../pages/TransactionReport';
 
-// Import other pages similarly
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
-  // Basic auth check
   React.useEffect(() => {
     const storedUsers = localStorage.getItem('vyapariUsers');
     if (!storedUsers || !JSON.parse(storedUsers).length) {
@@ -80,7 +78,9 @@ const Dashboard: React.FC = () => {
           >
             Reports
           </NavLink>
+
         </nav>
+
         <button className="btn btn-outline-light w-100 mt-4" onClick={handleLogout}>
           Logout
         </button>
@@ -88,6 +88,7 @@ const Dashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-grow-1" style={{ marginLeft: '250px', padding: '20px', backgroundColor: '#f8f9fa' }}>
+      
         <Routes>
           <Route index element={<DashboardHome />} />
           <Route path="customers" element={<div><h2>Customers</h2></div>} />
@@ -95,9 +96,8 @@ const Dashboard: React.FC = () => {
           <Route path="expenses" element={<div><h2>Expenses</h2></div>} />
           <Route path="cashbook" element={<div><h2>Cashbook</h2></div>} />
           <Route path="reports" element={<div><h2>Reports</h2></div>} />
-          <Route path="transactions" element={<TransactionReport />} />
-
-        </Routes>
+           <Route path="transactions" element={<TransactionReport />} /> 
+            </Routes>
       </div>
     </div>
   );
