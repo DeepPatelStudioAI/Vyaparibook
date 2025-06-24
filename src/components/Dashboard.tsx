@@ -3,6 +3,9 @@ import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import DashboardHome from '../pages/DashboardHome';
 import SuppliersPage from '../pages/SuppliersPage';
 import TransactionReport from '../pages/TransactionReport';
+import CustomersPage from "../pages/CustomersPage";
+import ExpensesPage from '../pages/ExpensesPage';
+
 
 
 const Dashboard: React.FC = () => {
@@ -38,14 +41,16 @@ const Dashboard: React.FC = () => {
           >
             Dashboard
           </NavLink>
+
           <NavLink
-            to="/dashboard/customers"
+            to="/dashboard/customer"
             className={({ isActive }) =>
               `nav-link text-white ${isActive ? 'text-success' : ''}`
             }
           >
-            Customers
+            Customer
           </NavLink>
+
           <NavLink
             to="/dashboard/suppliers"
             className={({ isActive }) =>
@@ -54,6 +59,7 @@ const Dashboard: React.FC = () => {
           >
             Suppliers
           </NavLink>
+
           <NavLink
             to="/dashboard/expenses"
             className={({ isActive }) =>
@@ -62,6 +68,7 @@ const Dashboard: React.FC = () => {
           >
             Expenses
           </NavLink>
+
           <NavLink
             to="/dashboard/cashbook"
             className={({ isActive }) =>
@@ -93,10 +100,11 @@ const Dashboard: React.FC = () => {
           <Route index element={<DashboardHome />} />
           <Route path="customers" element={<div><h2>Customers</h2></div>} />
           <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="customer" element={<CustomersPage />} />
           <Route path="expenses" element={<div><h2>Expenses</h2></div>} />
           <Route path="cashbook" element={<div><h2>Cashbook</h2></div>} />
           <Route path="reports" element={<div><h2>Reports</h2></div>} />
-           <Route path="transactions" element={<TransactionReport />} /> 
+           <Route path="transactions" element={<TransactionReport />} />       
             </Routes>
       </div>
     </div>
