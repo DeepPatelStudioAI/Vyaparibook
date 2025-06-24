@@ -1,14 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-// **REMOVE** any `import 'bootstrap/dist/css/bootstrap.min.css';`
-// because you’re loading via CDN above.
+import App from './App.tsx';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
-import Auth from './Auth';
-
-ReactDOM.createRoot(
-  document.getElementById('root')!
-).render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Auth />
+    <App />
   </React.StrictMode>
 );

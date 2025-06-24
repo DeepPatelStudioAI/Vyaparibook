@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const SignUp: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -13,8 +14,17 @@ const SignUp: React.FC = () => {
       alert('Passwords do not match');
       return;
     }
-    // TODO: call your signup API
-    alert(`Signing up:\nName: ${name}\nEmail: ${email}`);
+
+    const storedUsers = JSON.parse(localStorage.getItem('vyapariUsers') || '[]');
+    if (storedUsers.some((u: { email: string }) => u.email === email)) {
+      alert('Email already registered.');
+      return;
+    }
+
+    const newUsers = [...storedUsers, { name, email, password }];
+    localStorage.setItem('vyapariUsers', JSON.stringify(newUsers));
+    alert(`Sign-up successful! Welcome, ${name}. Please sign in.`);
+    navigate('/signin');
   };
 
   return (
@@ -33,7 +43,6 @@ const SignUp: React.FC = () => {
               required
             />
           </div>
-
           <div className="mb-3">
             <label className="form-label fw-medium">Email</label>
             <input
@@ -45,7 +54,6 @@ const SignUp: React.FC = () => {
               required
             />
           </div>
-
           <div className="mb-3">
             <label className="form-label fw-medium">Password</label>
             <input
@@ -58,7 +66,6 @@ const SignUp: React.FC = () => {
               minLength={6}
             />
           </div>
-
           <div className="mb-4">
             <label className="form-label fw-medium">Confirm Password</label>
             <input
@@ -71,12 +78,10 @@ const SignUp: React.FC = () => {
               minLength={6}
             />
           </div>
-
           <button type="submit" className="btn btn-success w-100">
             Sign Up
           </button>
         </form>
-
         <div className="text-center mt-3">
           <span>Already have an account? </span>
           <Link to="/signin">Sign In</Link>
