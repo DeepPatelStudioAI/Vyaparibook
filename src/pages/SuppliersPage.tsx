@@ -65,7 +65,7 @@ const SuppliersPage: React.FC = () => {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Suppliers</h2>
         <div className="d-flex gap-2">
-          <Button variant="outline-secondary" onClick={() => alert('Bulk upload functionality coming soon!')}> 
+          <Button variant="outline-secondary" onClick={() => alert('Bulk upload functionality coming soon!')}>
             <UploadCloud className="me-1" /> Bulk Upload
           </Button>
           <Button variant="primary" onClick={() => setShowModal(true)}>
@@ -80,7 +80,7 @@ const SuppliersPage: React.FC = () => {
           <div className="p-3 bg-info-subtle border rounded">
             <h6 className="text-info">Total Due</h6>
             <div className="d-flex justify-content-between align-items-center">
-              <h4 className="mb-0">₹{totalDue}</h4>
+              <h4 className="mb-0">₹{totalDue.toLocaleString()}</h4>
               <ArrowUpDown />
             </div>
           </div>
@@ -89,7 +89,7 @@ const SuppliersPage: React.FC = () => {
           <div className="p-3 bg-warning-subtle border rounded">
             <h6 className="text-warning">Total Paid</h6>
             <div className="d-flex justify-content-between align-items-center">
-              <h4 className="mb-0">₹{totalPaid}</h4>
+              <h4 className="mb-0">₹{totalPaid.toLocaleString()}</h4>
               <ArrowUpDown />
             </div>
           </div>
@@ -132,10 +132,15 @@ const SuppliersPage: React.FC = () => {
                   key={s.id}
                   className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${selected?.id === s.id ? 'active' : ''}`}
                   onClick={() => setSelected(s)}
+                  style={{ padding: '12px 16px' }}
                 >
-                  <span>{s.name}</span>
-                  <span>₹{s.amount > 0 ? s.amount : Math.abs(s.amount)} {s.amount > 0 ? 'Due' : 'Paid'}</span>
-                  <ChevronRight />
+                  <div className="d-flex flex-grow-1 justify-content-between align-items-center">
+                    <div className="fw-medium" style={{ minWidth: '150px' }}>{s.name}</div>
+                    <div className="text-end" style={{ minWidth: '200px' }}>
+                      ₹{Math.abs(s.amount).toLocaleString()} {s.amount > 0 ? 'Due' : 'Paid'}
+                    </div>
+                  </div>
+                  <ChevronRight className="ms-3" />
                 </button>
               ))}
             </div>
@@ -177,19 +182,35 @@ const SuppliersPage: React.FC = () => {
           <Form>
             <Form.Group className="mb-3">
               <Form.Label>Name</Form.Label>
-              <Form.Control type="text" value={newSupplier.name} onChange={e => setNewSupplier({...newSupplier, name: e.target.value})} />
+              <Form.Control
+                type="text"
+                value={newSupplier.name}
+                onChange={e => setNewSupplier({ ...newSupplier, name: e.target.value })}
+              />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Phone</Form.Label>
-              <Form.Control type="text" value={newSupplier.phone} onChange={e => setNewSupplier({...newSupplier, phone: e.target.value})} />
+              <Form.Control
+                type="text"
+                value={newSupplier.phone}
+                onChange={e => setNewSupplier({ ...newSupplier, phone: e.target.value })}
+              />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Email</Form.Label>
-              <Form.Control type="email" value={newSupplier.email} onChange={e => setNewSupplier({...newSupplier, email: e.target.value})} />
+              <Form.Control
+                type="email"
+                value={newSupplier.email}
+                onChange={e => setNewSupplier({ ...newSupplier, email: e.target.value })}
+              />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Amount</Form.Label>
-              <Form.Control type="number" value={newSupplier.amount} onChange={e => setNewSupplier({...newSupplier, amount: parseFloat(e.target.value)})} />
+              <Form.Control
+                type="number"
+                value={newSupplier.amount}
+                onChange={e => setNewSupplier({ ...newSupplier, amount: parseFloat(e.target.value) })}
+              />
             </Form.Group>
           </Form>
         </Modal.Body>
