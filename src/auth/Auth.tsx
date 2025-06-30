@@ -22,7 +22,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   }, []);
 
   const reset = () => {
-    setName(''); setEmail(''); setPassword(''); setConfirm('');
+    setName('');
+    setEmail('');
+    setPassword('');
+    setConfirm('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -30,9 +33,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     if (mode === 'signup') {
       if (password !== confirm) return alert('Passwords must match');
       if (users.some(u => u.email === email)) return alert('Email already registered');
-      const nu = [...users, { name, email, password }];
-      setUsers(nu);
-      localStorage.setItem('vyapariUsers', JSON.stringify(nu));
+      const newUser = [...users, { name, email, password }];
+      setUsers(newUser);
+      localStorage.setItem('vyapariUsers', JSON.stringify(newUser));
       alert('Sign-up successful! Please sign in.');
       setMode('signin');
       reset();
@@ -46,22 +49,47 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="vh-100 d-flex align-items-center justify-content-center" style={{ background: '#f0f8ff' }}>
+    <div
+      className="vh-100 d-flex align-items-center justify-content-center position-relative"
+      style={{ background: '#f0f8ff' }}
+    >
+      {/* Company name at top-left */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '20px',
+          left: '30px',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#007bff',
+        }}
+      >
+        VyapariBook
+      </div>
+
+      {/* Sign-in/up card */}
       <div className="card p-4" style={{ width: 350 }}>
         <div className="d-flex mb-3">
           <button
             className={`flex-fill btn ${mode === 'signin' ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => { setMode('signin'); reset(); }}
+            onClick={() => {
+              setMode('signin');
+              reset();
+            }}
           >
             Sign In
           </button>
           <button
             className={`flex-fill btn ms-2 ${mode === 'signup' ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => { setMode('signup'); reset(); }}
+            onClick={() => {
+              setMode('signup');
+              reset();
+            }}
           >
             Sign Up
           </button>
         </div>
+
         <form onSubmit={handleSubmit}>
           {mode === 'signup' && (
             <div className="mb-2">

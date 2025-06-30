@@ -6,7 +6,7 @@ interface AddPartyModalProps {
   onClose: () => void;
   onSubmit: (data: {
     name: string;
-    phoneNumber: string;
+    phone: string;
     email: string;
     balance: number;
     isReceivable: boolean;
@@ -15,33 +15,26 @@ interface AddPartyModalProps {
 
 const AddPartyModal: React.FC<AddPartyModalProps> = ({ show, onClose, onSubmit }) => {
   const [name, setName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');   // ← required now
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [balance, setBalance] = useState('');
   const [isReceivable, setIsReceivable] = useState(true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      return alert('Name is required');
-    }
-    if (!phoneNumber.trim()) {
-      return alert('Phone Number is required');
-    }
+    if (!name.trim()) return alert('Name is required');
+    if (!phoneNumber.trim()) return alert('Phone number is required');
     const amt = parseFloat(balance);
-    if (isNaN(amt)) {
-      return alert('Enter a valid amount');
-    }
+    if (isNaN(amt)) return alert('Enter a valid amount');
 
     onSubmit({
       name: name.trim(),
-      phoneNumber: phoneNumber.trim(),
+      phone: phoneNumber.trim(),
       email: email.trim(),
       balance: amt,
       isReceivable,
     });
 
-    // reset & close
     setName('');
     setPhoneNumber('');
     setEmail('');
@@ -55,7 +48,6 @@ const AddPartyModal: React.FC<AddPartyModalProps> = ({ show, onClose, onSubmit }
       <Modal.Header closeButton>
         <Modal.Title>Add Customer</Modal.Title>
       </Modal.Header>
-
       <Form onSubmit={handleSubmit}>
         <Modal.Body>
           <Form.Group className="mb-3">
@@ -63,9 +55,9 @@ const AddPartyModal: React.FC<AddPartyModalProps> = ({ show, onClose, onSubmit }
             <Form.Control
               type="text"
               value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Customer name"
+              onChange={(e) => setName(e.target.value)}
               required
+              placeholder="Customer name"
             />
           </Form.Group>
 
@@ -74,9 +66,9 @@ const AddPartyModal: React.FC<AddPartyModalProps> = ({ show, onClose, onSubmit }
             <Form.Control
               type="tel"
               value={phoneNumber}
-              onChange={e => setPhoneNumber(e.target.value)}
-              placeholder="10-digit phone"
+              onChange={(e) => setPhoneNumber(e.target.value)}
               required
+              placeholder="10-digit phone number"
             />
           </Form.Group>
 
@@ -85,7 +77,7 @@ const AddPartyModal: React.FC<AddPartyModalProps> = ({ show, onClose, onSubmit }
             <Form.Control
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="email@example.com"
             />
           </Form.Group>
@@ -95,9 +87,9 @@ const AddPartyModal: React.FC<AddPartyModalProps> = ({ show, onClose, onSubmit }
             <Form.Control
               type="number"
               value={balance}
-              onChange={e => setBalance(e.target.value)}
-              placeholder="e.g. 1500"
+              onChange={(e) => setBalance(e.target.value)}
               required
+              placeholder="e.g. 500"
             />
           </Form.Group>
 
@@ -120,7 +112,6 @@ const AddPartyModal: React.FC<AddPartyModalProps> = ({ show, onClose, onSubmit }
             />
           </Form.Group>
         </Modal.Body>
-
         <Modal.Footer>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button variant="primary" type="submit">Add</Button>

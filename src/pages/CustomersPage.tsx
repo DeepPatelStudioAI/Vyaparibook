@@ -1,206 +1,227 @@
-    // src/pages/CustomersPage.tsx
-    import React, { useEffect, useState } from 'react';
-    import { Plus, UploadCloud, Search, ArrowUpRight, ArrowDownRight, ChevronRight } from 'lucide-react';
-    import { Button, Form } from 'react-bootstrap';
-    import AddPartyModal from '../components/AddPartyModal';
+// src/pages/CustomersPage.tsx
+import React, { useEffect, useState } from 'react';
+import { Plus, Search, ArrowUpDown, ChevronRight } from 'lucide-react';
+import { Modal, Button, Form } from 'react-bootstrap';
 
-    interface Customer {
-    id: string;
-    name: string;
-    phone: string;
-    email: string;
-    balance: number;
-    status: 'active' | 'inactive';
-    createdAt: Date;
+interface Customer {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  balance: number;
+  status: 'active' | 'payable';
+  createdAt: string;
+}
+
+const CustomersPage: React.FC = () => {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState<'all' | 'active' | 'payable'>('all');
+  const [sort, setSort] = useState<'name' | 'date' | 'balance'>('name');
+  const [selected, setSelected] = useState<Customer | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [newCust, setNewCust] = useState({ name: '', phone: '', email: '', balance: 0, isReceivable: true });
+
+  // Load customers
+  useEffect(() => {
+    fetch('http://localhost:3001/api/customers')
+      .then(r => r.json())
+      .then(setCustomers)
+      .catch(console.error);
+  }, []);
+
+  // Add customer
+  const handleAdd = async () => {
+    const status = newCust.isReceivable ? 'active' : 'payable';
+    const body = { ...newCust, status };
+    try {
+      const res = await fetch('http://localhost:3001/api/customers', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error('Insert failed');
+      const added: Customer = await res.json();
+      setCustomers(c => [added, ...c]);
+      setShowModal(false);
+      setNewCust({ name:'', phone:'', email:'', balance:0, isReceivable:true });
+    } catch (e) {
+      console.error(e);
+      alert('Failed to add customer');
     }
+  };
 
-    const LOCAL_STORAGE_KEY = 'customers';
+  // Delete customer
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Delete this customer?')) return;
+    await fetch(`http://localhost:3001/api/customers/${id}`, { method: 'DELETE' });
+    setCustomers(c => c.filter(x => x.id !== id));
+    setSelected(null);
+  };
 
-    const CustomersPage: React.FC = () => {
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filter, setFilter] = useState<'all' | 'receivable' | 'payable'>('all');
-    const [sort, setSort] = useState<'name' | 'date' | 'amount'>('name');
-    const [selected, setSelected] = useState<Customer | null>(null);
-    const [showAddModal, setShowAddModal] = useState(false);
-
-    useEffect(() => {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (saved) {
-          const parsed: Customer[] = JSON.parse(saved).map((c: any) => ({
-            ...c,
-            createdAt: new Date(c.createdAt), // Convert string back to Date object
-          }));
-          setCustomers(parsed);
-        }
-      }, []);
-
-      
-      useEffect(() => {
-        console.log("Saving customers to localStorage...", customers);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(customers));
-      }, [customers]);
-      
-      
-    const totalReceivable = customers.filter(c => c.balance > 0).reduce((sum, c) => sum + c.balance, 0);
-    const totalPayable = customers.filter(c => c.balance < 0).reduce((sum, c) => sum + Math.abs(c.balance), 0);
-
-    const filtered = customers.filter(c => {
-        const matchesSearch =
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm);
-        const matchesFilter =
-        filter === 'all' ||
-        (filter === 'receivable' && c.balance > 0) ||
-        (filter === 'payable' && c.balance < 0);
-        return matchesSearch && matchesFilter;
+  // Filtering & sorting
+  let list = customers
+    .filter(c => searchTerm === '' || c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.phone.includes(searchTerm))
+    .filter(c => filter === 'all' || c.status === filter)
+    .sort((a,b) => {
+      if (sort === 'name') return a.name.localeCompare(b.name);
+      if (sort === 'date') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return b.balance - a.balance;
     });
 
-    const sorted = [...filtered].sort((a, b) => {
-        if (sort === 'name') return a.name.localeCompare(b.name);
-        if (sort === 'date') return b.createdAt.getTime() - a.createdAt.getTime();
-        if (sort === 'amount') return Math.abs(b.balance) - Math.abs(a.balance);
-        return 0;
-    });
+  // Totals
+  const totalDue = customers.reduce((sum,c) => sum + (c.status==='active'?c.balance:0), 0);
+  const totalPayable = customers.reduce((sum,c) => sum + (c.status==='payable'?c.balance:0), 0);
 
-    return (
-        <div className="p-4">
-        {/* Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-            <h2>Customers</h2>
-            <div className="d-flex gap-2">
-            <Button variant="outline-secondary" onClick={() => alert('Bulk upload coming soon!')}>
-                <UploadCloud className="me-1" /> Bulk Upload
-            </Button>
-            <Button variant="primary" onClick={() => setShowAddModal(true)}>
-                <Plus className="me-1" /> Add Customer
-            </Button>
+  return (
+    <div className="p-4">
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2>Customers</h2>
+        <Button variant="primary" onClick={() => setShowModal(true)}>
+          <Plus /> Add
+        </Button>
+      </div>
+
+      {/* Summary */}
+      <div className="row g-3 mb-4">
+        <div className="col-md-6">
+          <div className="p-3 bg-success-subtle border rounded">
+            <h6 className="text-success">Total Receivable</h6>
+            <div className="d-flex justify-content-between align-items-center">
+              <h4>₹{totalDue.toLocaleString()}</h4>
+              <ArrowUpDown />
             </div>
+          </div>
         </div>
-
-        {/* Summary Cards */}
-        <div className="row g-3 mb-4">
-            <div className="col-md-6">
-            <div className="p-3 bg-success-subtle border rounded">
-                <h6 className="text-success">Total Receivable</h6>
-                <div className="d-flex justify-content-between align-items-center">
-                <h4 className="text-success mb-0">₹{totalReceivable.toLocaleString()}</h4>
-                <ArrowUpRight className="text-success" />
-                </div>
+        <div className="col-md-6">
+          <div className="p-3 bg-warning-subtle border rounded">
+            <h6 className="text-warning">Total Payable</h6>
+            <div className="d-flex justify-content-between align-items-center">
+              <h4>₹{totalPayable.toLocaleString()}</h4>
+              <ArrowUpDown />
             </div>
-            </div>
-            <div className="col-md-6">
-            <div className="p-3 bg-danger-subtle border rounded">
-                <h6 className="text-danger">Total Payable</h6>
-                <div className="d-flex justify-content-between align-items-center">
-                <h4 className="text-danger mb-0">₹{totalPayable.toLocaleString()}</h4>
-                <ArrowDownRight className="text-danger" />
-                </div>
-            </div>
-            </div>
+          </div>
         </div>
+      </div>
 
-        {/* Controls */}
-        <div className="d-flex align-items-center gap-2 mb-4">
-            <div className="input-group" style={{ maxWidth: '300px' }}>
-            <span className="input-group-text"><Search /></span>
-            <input
-                type="text"
-                className="form-control"
-                placeholder="Search by customer name or phone number..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+      {/* Controls */}
+      <div className="d-flex gap-2 mb-4">
+        <div className="input-group" style={{ maxWidth: 300 }}>
+          <span className="input-group-text"><Search /></span>
+          <input
+            className="form-control"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Form.Select style={{ maxWidth: 150 }} value={filter} onChange={e => setFilter(e.target.value as any)}>
+          <option value="all">All</option>
+          <option value="active">Receivable</option>
+          <option value="payable">Payable</option>
+        </Form.Select>
+        <Form.Select style={{ maxWidth: 150 }} value={sort} onChange={e => setSort(e.target.value as any)}>
+          <option value="name">Name</option>
+          <option value="date">Date</option>
+          <option value="balance">Balance</option>
+        </Form.Select>
+      </div>
+
+      {/* List & Details */}
+      <div className="row">
+        <div className="col-md-8" style={{ maxHeight:'60vh', overflowY:'auto' }}>
+          {list.length === 0 ? (
+            <div className="text-center text-muted py-4">No customers.</div>
+          ) : (
+            <div className="list-group">
+              {list.map(c => (
+                <button
+                  key={c.id}
+                  className={`list-group-item d-flex justify-content-between ${selected?.id===c.id?'active':''}`}
+                  onClick={() => setSelected(c)}
+                >
+                  <span>{c.name}</span>
+                  <span>₹{c.balance.toLocaleString()}</span>
+                  <ChevronRight />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="col-md-4">
+          <div className="card shadow-sm">
+            <div className="card-body">
+              {selected ? (
+                <>
+                  <h5>{selected.name}</h5>
+                  <p><strong>Phone:</strong> {selected.phone}</p>
+                  <p><strong>Email:</strong> {selected.email}</p>
+                  <p><strong>Balance:</strong> ₹{selected.balance}</p>
+                  <p><strong>Status:</strong> {selected.status}</p>
+                  <p><strong>Created:</strong> {new Date(selected.createdAt).toLocaleDateString()}</p>
+                  <Button variant="outline-danger" onClick={() => handleDelete(selected.id)}>Remove</Button>
+                </>
+              ) : (
+                <div className="text-center text-muted">Select a customer</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Modal */}
+      <Modal show={showModal} onHide={() => setShowModal(false)}>
+        <Modal.Header closeButton><Modal.Title>Add Customer</Modal.Title></Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Name</Form.Label>
+              <Form.Control
+                value={newCust.name}
+                onChange={e => setNewCust({ ...newCust, name: e.target.value })}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Phone</Form.Label>
+              <Form.Control
+                value={newCust.phone}
+                onChange={e => setNewCust({ ...newCust, phone: e.target.value })}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Email</Form.Label>
+              <Form.Control
+                type="email"
+                value={newCust.email}
+                onChange={e => setNewCust({ ...newCust, email: e.target.value })}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Balance</Form.Label>
+              <Form.Control
+                type="number"
+                value={newCust.balance}
+                onChange={e => setNewCust({ ...newCust, balance: +e.target.value })}
+              />
+            </Form.Group>
+            <Form.Check 
+              type="radio" name="type" label="Receivable" 
+              checked={newCust.isReceivable}
+              onChange={() => setNewCust(n => ({ ...n, isReceivable: true }))}
             />
-            </div>
-            <Form.Select style={{ maxWidth: '150px' }} value={filter} onChange={e => setFilter(e.target.value as any)}>
-            <option value="all">All</option>
-            <option value="receivable">Receivable</option>
-            <option value="payable">Payable</option>
-            </Form.Select>
-            <Form.Select style={{ maxWidth: '150px' }} value={sort} onChange={e => setSort(e.target.value as any)}>
-            <option value="name">Name</option>
-            <option value="date">Date</option>
-            <option value="amount">Amount</option>
-            </Form.Select>
-        </div>
+            <Form.Check 
+              type="radio" name="type" label="Payable" 
+              checked={!newCust.isReceivable}
+              onChange={() => setNewCust(n => ({ ...n, isReceivable: false }))}
+            />
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
+          <Button variant="primary" onClick={handleAdd}>Add</Button>
+        </Modal.Footer>
+      </Modal>
+    </div>
+  );
+};
 
-        {/* List & Details */}
-        <div className="row">
-            {/* List Pane */}
-            <div className="col-md-8" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-            {sorted.length === 0 ? (
-                <div className="text-center text-muted py-4">No customers found.</div>
-            ) : (
-                <div className="list-group">
-                {sorted.map(c => (
-                    <button
-                    key={c.id}
-                    className={`list-group-item list-group-item-action d-flex align-items-center ${selected?.id === c.id ? 'active' : ''}`}                  onClick={() => setSelected(c)}
-                    style={{ padding: '12px 16px' }}
-                    >
-                    <div className="flex-grow-1 d-flex justify-content-between align-items-center">
-                        <div style={{ minWidth: '150px' }}>{c.name}</div>
-                        <div style={{ minWidth: '200px' }} className="text-end">
-                        ₹{Math.abs(c.balance).toLocaleString()} {c.balance >= 0 ? 'Receivable' : 'Payable'}
-                        </div>
-                    </div>
-                    <ChevronRight className="ms-3" />
-                    </button>
-                ))}
-                </div>
-            )}
-            </div>
-
-            {/* Details Pane */}
-            <div className="col-md-4">
-            <div className="card shadow-sm">
-                <div className="card-body">
-                {selected ? (
-                    <>
-                    <h5 className="card-title mb-2">Customer Name: {selected.name}</h5>
-                    <p className="mb-1"><strong>Phone Number:</strong> {selected.phone}</p>
-                    <p className="mb-1"><strong>Email:</strong> {selected.email}</p>
-                    <p className="mb-1"><strong>Status:</strong> {selected.status}</p>
-                    <p className="mb-1"><strong>Joined:</strong> {selected.createdAt.toLocaleDateString()}</p>
-                    <p className="mb-1"><strong>Balance:</strong> ₹{Math.abs(selected.balance).toLocaleString()}</p>
-                    <div className="d-grid gap-2 mt-3">
-                        <Button variant="outline-danger" onClick={() => {
-                        setCustomers(prev => prev.filter(x => x.id !== selected.id));
-                        setSelected(null);
-                        }}>Remove Customer</Button>
-                    </div>
-                    </>
-                ) : (
-                    <div className="text-center text-muted py-4">Select a customer to view details</div>
-                )}
-                </div>
-            </div>
-            </div>
-        </div>
-
-        {/* Add Party Modal */}
-        <AddPartyModal
-  show={showAddModal}
-  onClose={() => setShowAddModal(false)}
-  onSubmit={(party) => {
-    const newCustomer: Customer = {
-      id: Date.now().toString(),
-      name: party.name,
-      phone: party.phone || '',
-      email: party.email || '',
-      balance: party.isReceivable ? party.balance : -party.balance,
-      status: 'active',
-      createdAt: new Date(),
-    };
-
-    setCustomers((prev) => [newCustomer, ...prev]);
-    setSelected(newCustomer);
-    alert('Customer added successfully!');
-  }}
-/>
-
-        </div>
-    );
-    };
-
-    export default CustomersPage;
+export default CustomersPage;

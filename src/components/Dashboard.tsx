@@ -1,10 +1,6 @@
+// src/components/Dashboard.tsx
 import React from 'react';
-import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import DashboardHome from '../pages/DashboardHome';
-import SuppliersPage from '../pages/SuppliersPage';
-import ExpensesPage from '../pages/ExpensesPage';
-import CustomersPage from "../pages/CustomersPage";
-import TransactionReport from '../pages/TransactionReport';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -44,17 +40,9 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div className="flex-grow-1" style={{ marginLeft: '250px', padding: '20px', backgroundColor: '#f8f9fa' }}>
-        <Routes>
-          <Route index element={<DashboardHome />} />
-          <Route path="customer" element={<CustomersPage />} />
-          <Route path="suppliers" element={<SuppliersPage />} />
-          <Route path="expenses" element={<ExpensesPage />} />
-          <Route path="cashbook" element={<div><h2>Cashbook</h2></div>} />
-          <Route path="reports" element={<div><h2>Reports</h2></div>} />
-          <Route path="transactions" element={<TransactionReport />} />
-        </Routes>
+        <Outlet /> {/* This is where each page will render */}
       </div>
     </div>
   );
