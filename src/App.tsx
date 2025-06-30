@@ -1,45 +1,32 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Auth from './Auth';
+// App.tsx or MainRoutes.tsx
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Auth from './auth/Auth';
 import Dashboard from './components/Dashboard';
+import CustomersPage from './pages/CustomersPage';
+import SuppliersPage from './pages/SuppliersPage';
+import ExpensesPage from './pages/ExpensesPage';
+import DashboardHome from './pages/DashboardHome';
+import TransactionReport from './pages/TransactionReport';
 
-const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userName, setUserName] = useState("");
-
+function App() {
   return (
     <Router>
       <Routes>
-        <Route 
-          path="/dashboard/*" 
-          element={
-            isAuthenticated ? 
-              <Dashboard /> : 
-              <Navigate to="/auth" replace />
-          } 
-        />
-        <Route 
-          path="/auth" 
-          element={
-            <Auth 
-              onLogin={(name) => {
-                setUserName(name);
-                setIsAuthenticated(true);
-              }} 
-            />
-          } 
-        />
-        <Route 
-          path="*" 
-          element={
-            isAuthenticated ? 
-              <Navigate to="/dashboard" replace /> : 
-              <Navigate to="/auth" replace />
-          } 
-        />
+        <Route path="/" element={<Auth onLogin={(name) => console.log(name)} />} />
+        
+        {/* Dashboard Layout Route */}
+        <Route path="/dashboard" element={<Dashboard />}>
+          <Route index element={<DashboardHome />} />
+          <Route path="customer" element={<CustomersPage />} />
+          <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="cashbook" element={<div><h2>Cashbook</h2></div>} />
+          <Route path="reports" element={<div><h2>Reports</h2></div>} />
+          <Route path="transactions" element={<TransactionReport />} />
+        </Route>
       </Routes>
     </Router>
   );
-};
+}
 
 export default App;

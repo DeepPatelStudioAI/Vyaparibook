@@ -1,69 +1,87 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getUsers } from "../utils/storage";
 
-type User = { name: string; email: string; password: string };
-
-interface SignInProps {
-  onLogin?: (name: string) => void; // Optional prop to match Auth.tsx
-}
-
-const SignIn: React.FC<SignInProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const SignIn = () => {
   const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const storedUsers: User[] = JSON.parse(localStorage.getItem('vyapariUsers') || '[]');
-    const found = storedUsers.find(u => u.email === email);
-    if (!found) {
-      alert('No account found.');
-      return;
+    const users = getUsers();
+    const user = users.find((u: any) => u.email === email && u.password === password);
+    if (user) {
+      navigate("/dashboard");
+    } else {
+      alert("Invalid credentials");
     }
-    if (found.password !== password) {
-      alert('Incorrect password.');
-      return;
-    }
-
-    if (onLogin) onLogin(found.name);
-    navigate('/Dashboard');
   };
 
   return (
-    <div className="d-flex justify-content-center align-items-center vh-100" style={{ backgroundColor: '#f8f9fa' }}>
-      <div className="card shadow-sm p-4" style={{ maxWidth: '400px', width: '100%' }}>
-        <h3 className="card-title text-center mb-4">Sign In</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label fw-medium">Email</label>
+    <div style={{ backgroundColor: "#f1f8ff", minHeight: "100vh" }}>
+      {/* Top Bar */}
+      <div style={{
+        width: "100%",
+        padding: "15px 30px",
+        backgroundColor: "#2c3e50",
+        color: "white",
+        fontSize: "22px",
+        fontWeight: "bold",
+        position: "sticky",
+        top: 0,
+        left: 0,
+        zIndex: 1000,
+      }}>
+        VyapariBook
+      </div>
+
+      {/* Centered Sign In Box */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "calc(100vh - 70px)", // subtract navbar height
+      }}>
+        <div style={{
+          backgroundColor: "white",
+          padding: "30px",
+          borderRadius: "10px",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+          width: "100%",
+          maxWidth: "400px",
+        }}>
+          {/* Your Tabs and Inputs */}
+          <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+            <button style={{ flex: 1, padding: "10px", backgroundColor: "#0066ff", color: "white", border: "none", borderRadius: "6px" }}>
+              Sign In
+            </button>
+            <button style={{ flex: 1, padding: "10px", border: "1px solid #0066ff", borderRadius: "6px", backgroundColor: "white", color: "#0066ff" }}>
+              Sign Up
+            </button>
+          </div>
+
+          <form onSubmit={handleLogin}>
             <input
               type="email"
-              className="form-control"
-              placeholder="you@example.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
               required
+              style={{ width: "100%", padding: "10px", marginBottom: "10px", borderRadius: "6px", backgroundColor: "#e8f0fe", border: "none" }}
             />
-          </div>
-          <div className="mb-4">
-            <label className="form-label fw-medium">Password</label>
             <input
               type="password"
-              className="form-control"
-              placeholder="••••••••"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
               required
-              minLength={6}
+              style={{ width: "100%", padding: "10px", marginBottom: "20px", borderRadius: "6px", backgroundColor: "#e8f0fe", border: "none" }}
             />
-          </div>
-          <button type="submit" className="btn btn-primary w-100">
-            Sign In
-          </button>
-        </form>
-        <div className="text-center mt-3">
-          <span>Don't have an account? </span>
-          <Link to="/signup">Sign Up</Link>
+            <button type="submit" style={{ width: "100%", padding: "12px", backgroundColor: "#14833b", color: "white", border: "none", borderRadius: "6px" }}>
+              Sign In
+            </button>
+          </form>
         </div>
       </div>
     </div>
