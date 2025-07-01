@@ -10,6 +10,14 @@ const DashboardHome: React.FC = () => {
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [pendingDues, setPendingDues] = useState(0);
 
+  // ✅ Format INR Currency
+  const formatINR = (amount: number): string =>
+    new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+    }).format(amount);
+
   useEffect(() => {
     fetch('http://localhost:3001/api/customers')
       .then(res => res.json())
@@ -32,24 +40,24 @@ const DashboardHome: React.FC = () => {
     {
       title: 'Total Customers',
       value: totalCustomers.toString(),
-      icon: <Users size={32} className="text-blue-600" />, 
+      icon: <Users size={32} className="text-blue-600" />,
       route: '/dashboard/customer',
     },
     {
       title: 'Total Suppliers',
       value: totalSuppliers.toString(),
-      icon: <Truck size={32} className="text-green-600" />, 
+      icon: <Truck size={32} className="text-green-600" />,
       route: '/dashboard/suppliers',
     },
     {
       title: 'Total Revenue',
-      value: `₹${totalRevenue}`,
-      icon: <BarChart2 size={32} className="text-purple-600" />, 
+      value: formatINR(totalRevenue), // ✅ Proper INR formatting
+      icon: <BarChart2 size={32} className="text-purple-600" />,
     },
     {
       title: 'Pending Dues',
-      value: `₹${pendingDues}`,
-      icon: <AlertCircle size={32} className="text-red-600" />, 
+      value: formatINR(pendingDues), // ✅ Proper INR formatting
+      icon: <AlertCircle size={32} className="text-red-600" />,
     },
   ];
 

@@ -86,27 +86,26 @@ app.delete('/api/customers/:id', (req, res) => {
 });
 
 
-// Supplier routes
 app.post('/api/suppliers', (req, res) => {
   const { name, phone, email, amount, status } = req.body;
-  const sql = `INSERT INTO suppliers (name, phone, email, amount, status, createdAt) VALUES (?, ?, ?, ?, ?, NOW())`;
-  db.query(sql, [name, phone, email, amount, status], (err, result) => {
-    if (err) return res.status(500).json({ error: 'Insert failed' });
-    res.json({ id: result.insertId, name, phone, email, amount, status, createdAt: new Date().toISOString() });
-  });
-});
-app.get('/api/suppliers', (req, res) => {
-  db.query('SELECT * FROM suppliers ORDER BY createdAt DESC', (err, results) => {
-    if (err) return res.status(500).json({ error: 'Fetch failed' });
-    res.json(results);
-  });
-});
-app.delete('/api/suppliers/:id', (req, res) => {
-  const { id } = req.params;
-  db.query('DELETE FROM suppliers WHERE id = ?', [id], (err) => {
-    if (err) return res.status(500).json({ error: 'Delete failed' });
-    res.json({ success: true });
-  });
-});
 
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+  console.log('📥 Incoming supplier:', req.body); // Add this line
+
+  const sql = `
+    INSERT INTO suppliers (name, phone, email, amount, status, createdAt)
+    VALUES (?, ?, ?, ?, ?, NOW())
+  `;
+
+  db.query(sql, [name, phone, email, amount, status], (err, result) => {
+    if (err) {
+      console.error('❌ Supplier Insert Error:', err.message);
+      return res.status(500).json({ error: 'Insert failed', details: err.message });
+    }
+
+    res.json({
+      id: result.insertId,
+      name, phone, email, amount, status,
+      createdAt: new Date().toISOString(),
+    });
+  });
+});

@@ -31,7 +31,6 @@ const Dashboard: React.FC = () => {
           <NavLink to="/dashboard/suppliers" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Suppliers</NavLink>
           <NavLink to="/dashboard/expenses" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Expenses</NavLink>
           <NavLink to="/dashboard/cashbook" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Cashbook</NavLink>
-          <NavLink to="/dashboard/reports" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Reports</NavLink>
           <NavLink to="/dashboard/transactions" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Transactions</NavLink>
         </nav>
 
