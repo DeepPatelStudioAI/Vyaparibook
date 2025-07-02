@@ -1,195 +1,280 @@
 // src/pages/InventoryPage.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  Plus,
-  Search,
-  Edit3,
-  Trash2,
-  Package,
-  AlertTriangle,
-  TrendingUp,
+  Plus, Search, Edit3, Trash2, Package, AlertTriangle, TrendingUp,
 } from 'lucide-react';
-import { Modal, Button, Form, Badge, InputGroup } from 'react-bootstrap';
+import { Modal, Button, Form, Badge, InputGroup, Row, Col, Card, Table } from 'react-bootstrap';
 import { Product } from '../types';
 
-// Utility for formatting INR
-const formatCurrency = (amount: number): string =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency', currency: 'INR', minimumFractionDigits: 2,
-  }).format(amount);
+// Formatting helper
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
 const InventoryPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState<'all' | 'manufactured' | 'purchased'>('all');
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<Partial<Product>>({ name: '', description: '', basePrice: 0, costPrice: 0, stockQuantity: 0, category: 'manufactured' });
+  const [filterCat, setFilterCat] = useState<'all' | 'manufactured' | 'purchased'>('all');
+  const [show, setShow] = useState(false);
+  const [edit, setEdit] = useState<Product | null>(null);
+  const [form, setForm] = useState<Partial<Product>>({
+    name: '', description: '', basePrice: 0, costPrice: 0, stockQuantity: 0, category: 'manufactured',
+  });
 
-  // fetch on mount
+  // load
   useEffect(() => {
-    const stored = localStorage.getItem('products');
-    setProducts(stored ? JSON.parse(stored) : []);
+    const ls = localStorage.getItem('products');
+    setProducts(ls ? JSON.parse(ls) : []);
   }, []);
 
-  const saveProducts = (list: Product[]) => {
+  const save = (list: Product[]) => {
     setProducts(list);
     localStorage.setItem('products', JSON.stringify(list));
   };
 
-  const totalProducts = products.length;
+  // stats
+  const total = products.length;
   const lowStock = products.filter(p => p.stockQuantity! < 5).length;
-  const totalValue = products.reduce((sum, p) => sum + (p.basePrice! * p.stockQuantity!), 0);
-  const categories = Array.from(new Set(products.map(p => p.category!))).length;
+  const invValue = products.reduce((s, p) => s + p.basePrice! * p.stockQuantity!, 0);
+  const categories = new Set(products.map(p => p.category)).size;
 
-  const filtered = products
-    .filter(p => filterCategory === 'all' || p.category === filterCategory)
+  // filtered list
+  const list = products
+    .filter(p => filterCat === 'all' || p.category === filterCat)
     .filter(p => p.name!.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const openForm = (prod?: Product) => {
+  const openModal = (prod?: Product) => {
     if (prod) {
-      setEditing(prod);
+      setEdit(prod);
       setForm(prod);
     } else {
-      setEditing(null);
+      setEdit(null);
       setForm({ name: '', description: '', basePrice: 0, costPrice: 0, stockQuantity: 0, category: 'manufactured' });
     }
-    setShowModal(true);
+    setShow(true);
   };
 
   const handleSubmit = () => {
-    const product: Product = {
-      id: editing ? editing.id : Date.now().toString(),
+    const prod: Product = {
+      id: edit?.id ?? Date.now().toString(),
       name: form.name!,
       description: form.description!,
       basePrice: form.basePrice!,
       costPrice: form.costPrice!,
       stockQuantity: form.stockQuantity!,
       category: form.category!,
-      createdAt: editing ? editing.createdAt : new Date().toISOString(),
+      createdAt: edit?.createdAt ?? new Date().toISOString(),
     };
-    const updated = editing
-      ? products.map(p => p.id === product.id ? product : p)
-      : [product, ...products];
-    saveProducts(updated);
-    setShowModal(false);
+    const updated = edit
+      ? products.map(p => p.id === prod.id ? prod : p)
+      : [prod, ...products];
+    save(updated);
+    setShow(false);
   };
 
   const handleDelete = (id: string) => {
     if (!window.confirm('Delete this product?')) return;
-    saveProducts(products.filter(p => p.id !== id));
+    save(products.filter(p => p.id !== id));
   };
 
   const updateStock = (id: string, qty: number) => {
-    const updated = products.map(p => p.id === id ? { ...p, stockQuantity: qty } : p);
-    saveProducts(updated);
+    save(products.map(p => p.id === id ? { ...p, stockQuantity: qty } : p));
   };
 
   return (
     <div className="p-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="fw-bold text-primary">Inventory</h2>
-        <Button onClick={() => openForm()}><Plus className="me-1" /> Add Product</Button>
-      </div>
+      {/* Header */}
+      <Row className="align-items-center mb-4">
+        <Col><h2 className="text-primary">Inventory</h2></Col>
+        <Col className="text-end">
+          <Button variant="outline-primary" onClick={() => openModal()}>
+            <Plus className="me-1" /> Add Product
+          </Button>
+        </Col>
+      </Row>
 
-      <div className="row g-3 mb-4">
+      {/* Summary Cards */}
+      <Row className="g-3 mb-4">
         {[
-          { title: 'Total Products', value: totalProducts, icon: <Package className="text-blue-600" /> },
-          { title: 'Low Stock', value: lowStock, icon: <AlertTriangle className="text-red-600" /> },
-          { title: 'Inventory Value', value: formatCurrency(totalValue), icon: <TrendingUp className="text-green-600" /> },
-          { title: 'Categories', value: categories, icon: <Package className="text-purple-600" /> },
-        ].map((card, i) => (
-          <div key={i} className="col-md-3">
-            <div className="p-3 bg-light border rounded shadow-sm d-flex align-items-center justify-content-between">
-              <div>
-                <p className="mb-1 text-muted small">{card.title}</p>
-                <h4 className="mb-0">{card.value}</h4>
-              </div>
-              {card.icon}
-            </div>
-          </div>
+          { title: 'Total Products', val: total, icon: <Package />, bg: 'info' },
+          { title: 'Low Stock', val: lowStock, icon: <AlertTriangle />, bg: 'danger' },
+          { title: 'Inventory Value', val: formatCurrency(invValue), icon: <TrendingUp />, bg: 'success' },
+          { title: 'Categories', val: categories, icon: <Package />, bg: 'warning' },
+        ].map((c, i) => (
+          <Col md={3} key={i}>
+            <Card className="h-100 border-0 shadow-sm">
+              <Card.Header className={`bg-${c.bg} text-white d-flex align-items-center justify-content-between`}>
+                <span className="fw-semibold">{c.title}</span>
+                <div>{c.icon}</div>
+              </Card.Header>
+              <Card.Body>
+                <h4 className="mb-0">{c.val}</h4>
+              </Card.Body>
+            </Card>
+          </Col>
         ))}
-      </div>
+      </Row>
 
-      <div className="d-flex gap-3 mb-3">
-        <InputGroup className="flex-grow-1">
-          <InputGroup.Text><Search /></InputGroup.Text>
-          <Form.Control placeholder="Search products..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-        </InputGroup>
-        <Form.Select style={{ maxWidth: 200 }} value={filterCategory} onChange={e => setFilterCategory(e.target.value as any)}>
-          <option value="all">All Categories</option>
-          <option value="manufactured">Manufactured</option>
-          <option value="purchased">Purchased</option>
-        </Form.Select>
-      </div>
+      {/* Search & Filter */}
+      <Card className="mb-4 shadow-sm">
+        <Card.Body>
+          <Row className="g-3">
+            <Col md={6}>
+              <InputGroup>
+                <InputGroup.Text><Search /></InputGroup.Text>
+                <Form.Control
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </InputGroup>
+            </Col>
+            <Col md={3}>
+              <Form.Select value={filterCat} onChange={e => setFilterCat(e.target.value as any)}>
+                <option value="all">All Categories</option>
+                <option value="manufactured">Manufactured</option>
+                <option value="purchased">Purchased</option>
+              </Form.Select>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
 
-      <div className="table-responsive">
-        <table className="table table-hover">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Category</th>
-              <th>Base Price</th>
-              <th>Cost Price</th>
-              <th>Stock</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(p => (
-              <tr key={p.id}>
-                <td>
-                  <strong>{p.name}</strong><br />
-                  <small className="text-muted">{p.description}</small>
-                </td>
-                <td><Badge bg={p.category === 'manufactured' ? 'info' : 'secondary'}>{p.category}</Badge></td>
-                <td>{formatCurrency(p.basePrice!)}</td>
-                <td>{formatCurrency(p.costPrice!)}</td>
-                <td>
-                  <input
-                    type="number"
-                    className="form-control form-control-sm"
-                    value={p.stockQuantity}
-                    onChange={e => updateStock(p.id, +e.target.value)}
-                    style={{ width: '80px' }}
-                  />
-                  {p.stockQuantity! < 5 && <AlertTriangle className="text-danger ms-1" />}
-                </td>
-                <td>
-                  <Button variant="light" size="sm" onClick={() => openForm(p)}><Edit3 /></Button>{' '}
-                  <Button variant="light" size="sm" onClick={() => handleDelete(p.id)}><Trash2 className="text-danger" /></Button>
-                </td>
+      {/* Products Table */}
+      <Card className="shadow-sm">
+        <Card.Header className="bg-white border-bottom-0">
+          <h5 className="mb-0">Products</h5>
+        </Card.Header>
+        <Card.Body className="p-0">
+          <Table hover responsive className="mb-0">
+            <thead className="table-light">
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Base Price</th>
+                <th>Cost Price</th>
+                <th>Stock</th>
+                <th className="text-end">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {list.map(p => (
+                <tr key={p.id}>
+                  <td>
+                    <div className="fw-semibold">{p.name}</div>
+                    <div className="text-muted small">{p.description}</div>
+                  </td>
+                  <td>
+                    <Badge bg={p.category === 'manufactured' ? 'info' : 'secondary'} pill>
+                      {p.category.charAt(0).toUpperCase() + p.category.slice(1)}
+                    </Badge>
+                  </td>
+                  <td>{formatCurrency(p.basePrice!)}</td>
+                  <td>{formatCurrency(p.costPrice!)}</td>
+                  <td>
+                    <InputGroup size="sm" className="w-50">
+                      <Form.Control
+                        type="number"
+                        value={p.stockQuantity}
+                        onChange={e => updateStock(p.id, +e.target.value)}
+                      />
+                      {p.stockQuantity! < 5 && <InputGroup.Text className="bg-danger text-white"><AlertTriangle /></InputGroup.Text>}
+                    </InputGroup>
+                  </td>
+                  <td className="text-end">
+                    <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => openModal(p)}>
+                      <Edit3 />
+                    </Button>
+                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(p.id)}>
+                      <Trash2 />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card.Body>
+      </Card>
 
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+      {/* Modal */}
+      <Modal show={show} onHide={() => setShow(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>{editing ? 'Edit' : 'Add'} Product</Modal.Title>
+          <Modal.Title>{edit ? 'Edit Product' : 'Add Product'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
-            {['name','description','basePrice','costPrice','stockQuantity'].map((field) => (
-              <Form.Group key={field} className="mb-3">
-                <Form.Label>{field.charAt(0).toUpperCase()+field.slice(1)}</Form.Label>
-                <Form.Control
-                  type={field.includes('Price')||field==='stockQuantity' ? 'number' : 'text'}
-                  value={(form as any)[field]}
-                  onChange={e => setForm({ ...form, [field]: field==='description'?e.target.value: +e.target.value || e.target.value })}
-                />
-              </Form.Group>
-            ))}
-            <Form.Select className="mb-3" value={form.category} onChange={e=>setForm({...form,category:e.target.value as any})}>
-              <option value="manufactured">Manufactured</option>
-              <option value="purchased">Purchased</option>
-            </Form.Select>
+            <Row className="g-2">
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Name</Form.Label>
+                  <Form.Control
+                    value={form.name}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Category</Form.Label>
+                  <Form.Select
+                    value={form.category}
+                    onChange={e => setForm({ ...form, category: e.target.value as any })}
+                  >
+                    <option value="manufactured">Manufactured</option>
+                    <option value="purchased">Purchased</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={2}
+                    value={form.description}
+                    onChange={e => setForm({ ...form, description: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Base Price</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={form.basePrice}
+                    onChange={e => setForm({ ...form, basePrice: +e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Cost Price</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={form.costPrice}
+                    onChange={e => setForm({ ...form, costPrice: +e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Stock Qty</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={form.stockQuantity}
+                    onChange={e => setForm({ ...form, stockQuantity: +e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={()=>setShowModal(false)}>Cancel</Button>
-          <Button variant="primary" onClick={handleSubmit}>{editing?'Save':'Add'}</Button>
+          <Button variant="outline-secondary" onClick={() => setShow(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSubmit}>
+            {edit ? 'Save Changes' : 'Add Product'}
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>

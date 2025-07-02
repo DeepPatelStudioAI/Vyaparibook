@@ -26,36 +26,36 @@ const DashboardHome: React.FC = () => {
         setTotalRevenue(revenue);
         setPendingDues(dues);
       })
-      .catch(err => console.error('Error loading customer stats:', err));
+      .catch(err => console.error('Customer stats error:', err));
 
     fetch('http://localhost:3001/api/suppliers')
       .then(res => res.json())
       .then(data => setTotalSuppliers(data.length))
-      .catch(err => console.error('Error loading supplier stats:', err));
+      .catch(err => console.error('Supplier stats error:', err));
   }, []);
 
   const cards = [
     {
       title: 'Total Customers',
       value: totalCustomers.toString(),
-      icon: <Users size={32} className="text-blue-500" />,
+      icon: <Users className="w-6 h-6 text-blue-600" />,
       route: '/dashboard/customer',
     },
     {
       title: 'Total Suppliers',
       value: totalSuppliers.toString(),
-      icon: <Truck size={32} className="text-green-500" />,
+      icon: <Truck className="w-6 h-6 text-green-600" />,
       route: '/dashboard/suppliers',
     },
     {
       title: 'Total Revenue',
       value: formatCurrency(totalRevenue),
-      icon: <BarChart2 size={32} className="text-purple-500" />,
+      icon: <BarChart2 className="w-6 h-6 text-purple-600" />,
     },
     {
       title: 'Pending Dues',
       value: formatCurrency(pendingDues),
-      icon: <AlertCircle size={32} className="text-red-500" />,
+      icon: <AlertCircle className="w-6 h-6 text-red-600" />,
     },
   ];
 
@@ -63,23 +63,24 @@ const DashboardHome: React.FC = () => {
     <div
       key={idx}
       onClick={() => card.route && navigate(card.route)}
-      className="bg-white rounded-2xl shadow-md hover:shadow-xl hover:scale-[1.02] transition-transform cursor-pointer p-6 flex flex-col justify-between border border-gray-200"
+      className="group cursor-pointer bg-white border border-gray-200 hover:border-gray-300 rounded-xl p-6 shadow-sm hover:shadow-md transition duration-200"
     >
       <div className="flex items-center justify-between">
-        <div className="text-gray-600">{card.icon}</div>
-      </div>
-      <div className="mt-4">
-        <h3 className="text-lg font-medium text-gray-700">{card.title}</h3>
-        <p className="text-2xl font-semibold text-gray-900 mt-1">{card.value}</p>
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-full bg-gray-100 group-hover:scale-110 transition">{card.icon}</div>
+          <div>
+            <h4 className="text-sm text-gray-500">{card.title}</h4>
+            <p className="text-xl font-semibold text-gray-800">{card.value}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="min-h-screen px-6 py-8 bg-gradient-to-tr from-[#f9fafb] via-white to-[#f0f4f8]">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-800">📊 Dashboard Overview</h2>
-        <p className="text-sm text-gray-500 mt-1">Quick summary of your business metrics</p>
+        <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Dashboard Overview</h1>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
