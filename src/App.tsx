@@ -7,6 +7,7 @@ import SuppliersPage from './pages/SuppliersPage';
 import ExpensesPage from './pages/ExpensesPage';
 import DashboardHome from './pages/DashboardHome';
 import TransactionReport from './pages/TransactionReport';
+import InventoryPage from './pages/Inventorypage';
 
 function App() {
   return (
@@ -19,7 +20,7 @@ function App() {
           <Route index element={<DashboardHome />} />
           <Route path="customer" element={<CustomersPage />} />
           <Route path="suppliers" element={<SuppliersPage />} />
-          <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
           <Route path="cashbook" element={<div><h2>Cashbook</h2></div>} />
           <Route path="reports" element={<div><h2>Reports</h2></div>} />
           <Route path="transactions" element={<TransactionReport />} />

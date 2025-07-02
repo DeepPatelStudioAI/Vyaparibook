@@ -1,7 +1,7 @@
-// src/pages/DashboardHome.tsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Truck, BarChart2, AlertCircle } from 'lucide-react';
+import { formatCurrency } from '../utils/format';
 
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
@@ -10,21 +10,19 @@ const DashboardHome: React.FC = () => {
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [pendingDues, setPendingDues] = useState(0);
 
-  // ✅ Format INR Currency
-  const formatINR = (amount: number): string =>
-    new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-    }).format(amount);
-
   useEffect(() => {
     fetch('http://localhost:3001/api/customers')
       .then(res => res.json())
       .then(data => {
         setTotalCustomers(data.length);
-        const revenue = data.reduce((sum: number, cust: any) => sum + (cust.status === 'active' ? cust.balance : 0), 0);
-        const dues = data.reduce((sum: number, cust: any) => sum + (cust.status === 'payable' ? cust.balance : 0), 0);
+        const revenue = data.reduce(
+          (sum: number, cust: any) => sum + (cust.status === 'Receivable' ? cust.balance : 0),
+          0
+        );
+        const dues = data.reduce(
+          (sum: number, cust: any) => sum + (cust.status === 'payable' ? cust.balance : 0),
+          0
+        );
         setTotalRevenue(revenue);
         setPendingDues(dues);
       })
@@ -40,24 +38,24 @@ const DashboardHome: React.FC = () => {
     {
       title: 'Total Customers',
       value: totalCustomers.toString(),
-      icon: <Users size={32} className="text-blue-600" />,
+      icon: <Users size={32} className="text-blue-500" />,
       route: '/dashboard/customer',
     },
     {
       title: 'Total Suppliers',
       value: totalSuppliers.toString(),
-      icon: <Truck size={32} className="text-green-600" />,
+      icon: <Truck size={32} className="text-green-500" />,
       route: '/dashboard/suppliers',
     },
     {
       title: 'Total Revenue',
-      value: formatINR(totalRevenue), // ✅ Proper INR formatting
-      icon: <BarChart2 size={32} className="text-purple-600" />,
+      value: formatCurrency(totalRevenue),
+      icon: <BarChart2 size={32} className="text-purple-500" />,
     },
     {
       title: 'Pending Dues',
-      value: formatINR(pendingDues), // ✅ Proper INR formatting
-      icon: <AlertCircle size={32} className="text-red-600" />,
+      value: formatCurrency(pendingDues),
+      icon: <AlertCircle size={32} className="text-red-500" />,
     },
   ];
 
@@ -65,19 +63,24 @@ const DashboardHome: React.FC = () => {
     <div
       key={idx}
       onClick={() => card.route && navigate(card.route)}
-      className="bg-white text-black rounded-xl p-5 shadow-md hover:shadow-lg hover:scale-105 transition-transform cursor-pointer flex flex-col items-start"
+      className="bg-white rounded-2xl shadow-md hover:shadow-xl hover:scale-[1.02] transition-transform cursor-pointer p-6 flex flex-col justify-between border border-gray-200"
     >
-      <div className="text-3xl mb-2">{card.icon}</div>
-      <h4 className="text-lg font-semibold mb-1">{card.title}</h4>
-      <p className="text-xl font-bold">{card.value}</p>
+      <div className="flex items-center justify-between">
+        <div className="text-gray-600">{card.icon}</div>
+      </div>
+      <div className="mt-4">
+        <h3 className="text-lg font-medium text-gray-700">{card.title}</h3>
+        <p className="text-2xl font-semibold text-gray-900 mt-1">{card.value}</p>
+      </div>
     </div>
   );
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
-      <h2 className="text-3xl font-bold text-gray-800 mb-8 flex items-center gap-2">
-        📊 Dashboard Overview
-      </h2>
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-gray-800">📊 Dashboard Overview</h2>
+        <p className="text-sm text-gray-500 mt-1">Quick summary of your business metrics</p>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map(renderCard)}

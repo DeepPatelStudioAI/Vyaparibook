@@ -2,12 +2,15 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Search, ArrowUpDown, ChevronRight } from 'lucide-react';
 import { Modal, Button, Form, Badge } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 
+// Extend Customer interface to include address
 interface Customer {
   id: number;
   name: string;
   phone: string;
   email: string;
+  address?: string;
   balance: number;
   status: 'active' | 'payable';
   createdAt: string;
@@ -23,13 +26,22 @@ const formatINR = (amount: number): string => {
 };
 
 const CustomersPage: React.FC = () => {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'payable'>('all');
   const [sort, setSort] = useState<'name' | 'date' | 'balance'>('name');
   const [selected, setSelected] = useState<Customer | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [newCust, setNewCust] = useState({ name: '', phone: '', email: '', balance: 0, isReceivable: true });
+  // Include address in newCust state
+  const [newCust, setNewCust] = useState({ 
+    name: '', 
+    phone: '', 
+    email: '', 
+    address: '',
+    balance: 0, 
+    isReceivable: true 
+  });
 
   useEffect(() => {
     fetch('http://localhost:3001/api/customers')
@@ -38,6 +50,7 @@ const CustomersPage: React.FC = () => {
         const parsed = data.map((c: any) => ({
           ...c,
           balance: parseFloat(c.balance),
+          address: c.address || '',
         }));
         setCustomers(parsed);
       })
@@ -45,13 +58,18 @@ const CustomersPage: React.FC = () => {
   }, []);
 
   const handleAdd = async () => {
+    // validate phone
     if (newCust.phone.length !== 10) {
       alert('Phone number must be exactly 10 digits.');
       return;
     }
     const status = newCust.isReceivable ? 'active' : 'payable';
+    // include address in body
     const body = {
-      ...newCust,
+      name: newCust.name,
+      phone: newCust.phone,
+      email: newCust.email,
+      address: newCust.address,
       balance: parseFloat(newCust.balance.toString()) || 0,
       status,
     };
@@ -65,7 +83,7 @@ const CustomersPage: React.FC = () => {
       const added: Customer = await res.json();
       setCustomers(c => [added, ...c]);
       setShowModal(false);
-      setNewCust({ name: '', phone: '', email: '', balance: 0, isReceivable: true });
+      setNewCust({ name: '', phone: '', email: '', address: '', balance: 0, isReceivable: true });
     } catch (e) {
       console.error(e);
       alert('Failed to add customer');
@@ -92,11 +110,12 @@ const CustomersPage: React.FC = () => {
       return b.balance - a.balance;
     });
 
-  const totalDue = customers.reduce((sum, c) => sum + (c.status === 'active' ? (typeof c.balance === 'number' ? c.balance : 0) : 0), 0);
-  const totalPayable = customers.reduce((sum, c) => sum + (c.status === 'payable' ? (typeof c.balance === 'number' ? c.balance : 0) : 0), 0);
+  const totalDue = customers.reduce((sum, c) => sum + (c.status === 'active' ? c.balance : 0), 0);
+  const totalPayable = customers.reduce((sum, c) => sum + (c.status === 'payable' ? c.balance : 0), 0);
 
   return (
     <div className="p-4">
+      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2 className="fw-bold text-primary">Customers</h2>
         <Button variant="primary" onClick={() => setShowModal(true)}>
@@ -104,6 +123,7 @@ const CustomersPage: React.FC = () => {
         </Button>
       </div>
 
+      {/* Summary cards */}
       <div className="row g-3 mb-4">
         <div className="col-md-6">
           <div className="p-3 bg-light border border-success rounded shadow">
@@ -125,11 +145,10 @@ const CustomersPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Controls */}
       <div className="d-flex gap-3 mb-4 align-items-center">
         <div className="input-group" style={{ maxWidth: 300 }}>
-          <span className="input-group-text bg-white">
-            <Search />
-          </span>
+          <span className="input-group-text bg-white"><Search /></span>
           <input
             className="form-control"
             placeholder="Search..."
@@ -142,9 +161,9 @@ const CustomersPage: React.FC = () => {
           <option value="active">Receivable</option>
           <option value="payable">Payable</option>
         </Form.Select>
-        
       </div>
 
+      {/* List & Detail */}
       <div className="row">
         <div className="col-md-7">
           <div className="list-group shadow-sm rounded overflow-auto" style={{ maxHeight: '55vh' }}>
@@ -157,7 +176,10 @@ const CustomersPage: React.FC = () => {
                   className={`list-group-item d-flex justify-content-between align-items-center ${selected?.id === c.id ? 'active' : ''}`}
                   onClick={() => setSelected(c)}
                 >
-                  <span>{c.name}</span>
+                  <div>
+                    <strong>{c.name}</strong><br/>
+                    <small className="text-muted">{c.address}</small>
+                  </div>
                   <Badge bg={c.status === 'active' ? 'success' : 'danger'}>{c.status.toUpperCase()}</Badge>
                   <span className="fw-semibold">{formatINR(c.balance)}</span>
                   <ChevronRight />
@@ -174,6 +196,7 @@ const CustomersPage: React.FC = () => {
                   <h5 className="fw-bold mb-2 text-primary">{selected.name}</h5>
                   <p><strong>Phone:</strong> {selected.phone}</p>
                   <p><strong>Email:</strong> {selected.email}</p>
+                  <p><strong>Address:</strong> {selected.address}</p>
                   <p><strong>Balance:</strong> {formatINR(selected.balance)}</p>
                   <p><strong>Status:</strong> <Badge bg={selected.status === 'active' ? 'success' : 'danger'}>{selected.status.toUpperCase()}</Badge></p>
                   <p><strong>Created:</strong> {new Date(selected.createdAt).toLocaleDateString()}</p>
@@ -187,16 +210,14 @@ const CustomersPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Add Customer Modal */}
       <Modal show={showModal} onHide={() => setShowModal(false)}>
         <Modal.Header closeButton><Modal.Title>Add Customer</Modal.Title></Modal.Header>
         <Modal.Body>
           <Form>
             <Form.Group className="mb-3">
               <Form.Label>Name</Form.Label>
-              <Form.Control
-                value={newCust.name}
-                onChange={e => setNewCust({ ...newCust, name: e.target.value })}
-              />
+              <Form.Control value={newCust.name} onChange={e => setNewCust({ ...newCust, name: e.target.value })} />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Phone</Form.Label>
@@ -209,11 +230,11 @@ const CustomersPage: React.FC = () => {
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Email</Form.Label>
-              <Form.Control
-                type="email"
-                value={newCust.email}
-                onChange={e => setNewCust({ ...newCust, email: e.target.value })}
-              />
+              <Form.Control type="email" value={newCust.email} onChange={e => setNewCust({ ...newCust, email: e.target.value })} />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Address</Form.Label>
+              <Form.Control type="text" value={newCust.address} onChange={e => setNewCust({ ...newCust, address: e.target.value })} />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Balance</Form.Label>
@@ -224,20 +245,8 @@ const CustomersPage: React.FC = () => {
                 onChange={e => setNewCust({ ...newCust, balance: parseFloat(e.target.value) || 0 })}
               />
             </Form.Group>
-            <Form.Check
-              type="radio"
-              name="type"
-              label="Receivable"
-              checked={newCust.isReceivable}
-              onChange={() => setNewCust(n => ({ ...n, isReceivable: true }))}
-            />
-            <Form.Check
-              type="radio"
-              name="type"
-              label="Payable"
-              checked={!newCust.isReceivable}
-              onChange={() => setNewCust(n => ({ ...n, isReceivable: false }))}
-            />
+            <Form.Check inline type="radio" label="Receivable" checked={newCust.isReceivable} onChange={() => setNewCust(n => ({ ...n, isReceivable: true }))} />
+            <Form.Check inline type="radio" label="Payable" checked={!newCust.isReceivable} onChange={() => setNewCust(n => ({ ...n, isReceivable: false }))} />
           </Form>
         </Modal.Body>
         <Modal.Footer>
