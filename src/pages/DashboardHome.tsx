@@ -1,91 +1,94 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Row, Col, Card, Spinner } from 'react-bootstrap';
 import { Users, Truck, BarChart2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/format';
 
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
-  const [totalCustomers, setTotalCustomers] = useState(0);
-  const [totalSuppliers, setTotalSuppliers] = useState(0);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [pendingDues, setPendingDues] = useState(0);
+  const [totalCustomers, setTotalCustomers] = useState<number>(0);
+  const [totalSuppliers, setTotalSuppliers] = useState<number>(0);
+  const [totalRevenue, setTotalRevenue] = useState<number>(0);
+  const [pendingDues, setPendingDues] = useState<number>(0);
 
   useEffect(() => {
+    // Fetch customer stats
     fetch('http://localhost:3001/api/customers')
       .then(res => res.json())
       .then(data => {
         setTotalCustomers(data.length);
-        const revenue = data.reduce(
-          (sum: number, cust: any) => sum + (cust.status === 'Receivable' ? cust.balance : 0),
-          0
-        );
-        const dues = data.reduce(
-          (sum: number, cust: any) => sum + (cust.status === 'payable' ? cust.balance : 0),
-          0
-        );
-        setTotalRevenue(revenue);
-        setPendingDues(dues);
+        const receivable = data
+          .filter((c: any) => c.status === 'active')
+          .reduce((sum: number, c: any) => sum + parseFloat(c.balance), 0);
+        const payable = data
+          .filter((c: any) => c.status === 'payable')
+          .reduce((sum: number, c: any) => sum + parseFloat(c.balance), 0);
+        setTotalRevenue(receivable);
+        setPendingDues(payable);
       })
-      .catch(err => console.error('Customer stats error:', err));
+      .catch(console.error);
 
+    // Fetch supplier stats
     fetch('http://localhost:3001/api/suppliers')
       .then(res => res.json())
       .then(data => setTotalSuppliers(data.length))
-      .catch(err => console.error('Supplier stats error:', err));
+      .catch(console.error);
   }, []);
 
   const cards = [
     {
       title: 'Total Customers',
-      value: totalCustomers.toString(),
-      icon: <Users className="w-6 h-6 text-blue-600" />,
-      route: '/dashboard/customer',
+      value: totalCustomers,
+      icon: <Users className="text-blue-500" />, 
+      border: 'primary',
+      onClick: () => navigate('/dashboard/customer'),
     },
     {
       title: 'Total Suppliers',
-      value: totalSuppliers.toString(),
-      icon: <Truck className="w-6 h-6 text-green-600" />,
-      route: '/dashboard/suppliers',
+      value: totalSuppliers,
+      icon: <Truck className="text-green-500" />,
+      border: 'success',
+      onClick: () => navigate('/dashboard/suppliers'),
     },
     {
       title: 'Total Revenue',
-      value: formatCurrency(totalRevenue),
-      icon: <BarChart2 className="w-6 h-6 text-purple-600" />,
+      value: totalRevenue,
+      icon: <BarChart2 className="text-purple-500" />,
+      border: 'warning',
     },
     {
       title: 'Pending Dues',
-      value: formatCurrency(pendingDues),
-      icon: <AlertCircle className="w-6 h-6 text-red-600" />,
+      value: pendingDues,
+      icon: <AlertCircle className="text-red-500" />,
+      border: 'danger',
     },
   ];
 
-  const renderCard = (card: any, idx: number) => (
-    <div
-      key={idx}
-      onClick={() => card.route && navigate(card.route)}
-      className="group cursor-pointer bg-white border border-gray-200 hover:border-gray-300 rounded-xl p-6 shadow-sm hover:shadow-md transition duration-200"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-full bg-gray-100 group-hover:scale-110 transition">{card.icon}</div>
-          <div>
-            <h4 className="text-sm text-gray-500">{card.title}</h4>
-            <p className="text-xl font-semibold text-gray-800">{card.value}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen px-6 py-8 bg-gradient-to-tr from-[#f9fafb] via-white to-[#f0f4f8]">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Dashboard Overview</h1>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {cards.map(renderCard)}
-      </div>
+    <div className="p-4">
+      <h3 className="mb-4">Dashboard Overview</h3>
+      <Row className="g-3 mb-4">
+        {cards.map((card, idx) => (
+          <Col md={3} key={idx}>
+            <Card
+              className={`border-start border-4 border-${card.border} shadow-sm clickable`}
+              onClick={card.onClick}
+              style={{ cursor: card.onClick ? 'pointer' : 'default' }}
+            >
+              <Card.Body className="d-flex justify-content-between align-items-center">
+                <div>
+                  <div className={`text-${card.border} text-uppercase small fw-bold mb-1`}>{card.title}</div>
+                  <h5 className="fw-bold">
+                    {typeof card.value === 'number' ? formatCurrency(card.value) : card.value}
+                  </h5>
+                </div>
+                <div className="bg-light p-2 rounded">{card.icon}</div>
+              </Card.Body>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      {/* You can continue with other Dashboard sections here */}
     </div>
   );
 };

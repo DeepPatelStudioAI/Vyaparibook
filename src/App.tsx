@@ -1,33 +1,33 @@
-// App.tsx or MainRoutes.tsx
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Auth from './auth/Auth';
-import Dashboard from './components/Dashboard';
-import CustomersPage from './pages/CustomersPage';
-import SuppliersPage from './pages/SuppliersPage';
-import ExpensesPage from './pages/ExpensesPage';
-import DashboardHome from './pages/DashboardHome';
-import TransactionReport from './pages/TransactionReport';
-import InventoryPage from './pages/Inventorypage';
+// src/App.tsx
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Auth            from './auth/Auth';
+import Dashboard       from './components/Dashboard';
+import DashboardHome   from './pages/DashboardHome';
+import CustomersPage   from './pages/CustomersPage';
+import SuppliersPage   from './pages/SuppliersPage';
+import InventoryPage   from './pages/InventoryPage';
+import CashbookPage    from './pages/CashbookPage';
+import TransactionsPage from './pages/TransactionsPage';
 
-function App() {
+export default function App() {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Auth onLogin={(name) => console.log(name)} />} />
-        
-        {/* Dashboard Layout Route */}
+        <Route path="/" element={<Auth onLogin={()=>{/* redirect on success */}} />} />
         <Route path="/dashboard" element={<Dashboard />}>
           <Route index element={<DashboardHome />} />
           <Route path="customer" element={<CustomersPage />} />
-          <Route path="suppliers" element={<SuppliersPage />} />
-          <Route path="inventory" element={<InventoryPage />} />
-          <Route path="cashbook" element={<div><h2>Cashbook</h2></div>} />
-          <Route path="reports" element={<div><h2>Reports</h2></div>} />
-          <Route path="transactions" element={<TransactionReport />} />
+          <Route path="customers"  element={<CustomersPage />} />
+          <Route path="suppliers"  element={<SuppliersPage />} />
+          <Route path="inventory"  element={<InventoryPage />} />
+          <Route path="cashbook"   element={<CashbookPage />} />
+          <Route path="transactions" element={<TransactionsPage />} />
+
+          {/* catch‑all: redirect back */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
-
-export default App;

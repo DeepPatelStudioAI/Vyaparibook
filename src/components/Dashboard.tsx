@@ -30,8 +30,8 @@ const Dashboard: React.FC = () => {
           <NavLink to="/dashboard/customer" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Customer</NavLink>
           <NavLink to="/dashboard/suppliers" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Suppliers</NavLink>
           <NavLink to="/dashboard/inventory" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Inventory</NavLink>
-          <NavLink to="/dashboard/cashbook" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Cashbook</NavLink>
           <NavLink to="/dashboard/transactions" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Transactions</NavLink>
+          <NavLink to="/dashboard/invoice" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Invoice </NavLink>
         </nav>
 
         <button className="btn btn-outline-light w-100 mt-4" onClick={handleLogout}>

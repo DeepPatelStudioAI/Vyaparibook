@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Form, Button, Card } from 'react-bootstrap';
 
 const SignUp: React.FC = () => {
   const [name, setName] = useState('');
@@ -8,85 +9,65 @@ const SignUp: React.FC = () => {
   const [confirm, setConfirm] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (password !== confirm) {
       alert('Passwords do not match');
       return;
     }
 
-    const storedUsers = JSON.parse(localStorage.getItem('vyapariUsers') || '[]');
-    if (storedUsers.some((u: { email: string }) => u.email === email)) {
-      alert('Email already registered.');
-      return;
-    }
+    try {
+      const res = await fetch('http://localhost:3001/api/users/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-    const newUsers = [...storedUsers, { name, email, password }];
-    localStorage.setItem('vyapariUsers', JSON.stringify(newUsers));
-    alert(`Sign-up successful! Welcome, ${name}. Please sign in.`);
-    navigate('/signin');
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Registration failed');
+        return;
+      }
+
+      alert('Registration successful! Please sign in.');
+      navigate('/signin');
+    } catch (error) {
+      console.error('❌ Registration error:', error);
+      alert('Error registering');
+    }
   };
 
   return (
-    <div className="d-flex justify-content-center align-items-center vh-100" style={{ backgroundColor: '#f8f9fa' }}>
-      <div className="card shadow-sm p-4" style={{ maxWidth: '400px', width: '100%' }}>
-        <h3 className="card-title text-center mb-4">Sign Up</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label fw-medium">Name</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Your full name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              required
-            />
+    <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
+      <Card className="p-4 shadow" style={{ minWidth: '400px' }}>
+        <h3 className="mb-3 text-center">Sign Up</h3>
+        <Form onSubmit={handleSubmit}>
+          <Form.Group className="mb-3">
+            <Form.Label>Name</Form.Label>
+            <Form.Control value={name} onChange={(e) => setName(e.target.value)} required />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Email</Form.Label>
+            <Form.Control type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Password</Form.Label>
+            <Form.Control type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </Form.Group>
+          <Form.Group className="mb-4">
+            <Form.Label>Confirm Password</Form.Label>
+            <Form.Control type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+          </Form.Group>
+          <Button variant="primary" type="submit" className="w-100">
+            Register
+          </Button>
+          <div className="text-center mt-3">
+            Already have an account? <a href="/signin">Sign In</a>
           </div>
-          <div className="mb-3">
-            <label className="form-label fw-medium">Email</label>
-            <input
-              type="email"
-              className="form-control"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="mb-3">
-            <label className="form-label fw-medium">Password</label>
-            <input
-              type="password"
-              className="form-control"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
-          <div className="mb-4">
-            <label className="form-label fw-medium">Confirm Password</label>
-            <input
-              type="password"
-              className="form-control"
-              placeholder="Repeat your password"
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
-          <button type="submit" className="btn btn-success w-100">
-            Sign Up
-          </button>
-        </form>
-        <div className="text-center mt-3">
-          <span>Already have an account? </span>
-          <Link to="/signin">Sign In</Link>
-        </div>
-      </div>
+        </Form>
+      </Card>
     </div>
   );
 };

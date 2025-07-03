@@ -1,89 +1,60 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { getUsers } from "../utils/storage";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Form, Button, Card } from 'react-bootstrap';
 
-const SignIn = () => {
+const SignIn: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const users = getUsers();
-    const user = users.find((u: any) => u.email === email && u.password === password);
-    if (user) {
-      navigate("/dashboard");
-    } else {
-      alert("Invalid credentials");
+
+    try {
+      const res = await fetch('http://localhost:3001/api/users/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Login failed');
+        return;
+      }
+
+      // Save user to localStorage
+      localStorage.setItem('vyapariUser', JSON.stringify(data.user));
+      alert('Login successful');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('❌ Login error:', error);
+      alert('Error logging in');
     }
   };
 
   return (
-    <div style={{ backgroundColor: "#f1f8ff", minHeight: "100vh" }}>
-      {/* Top Bar */}
-      <div style={{
-        width: "100%",
-        padding: "15px 30px",
-        backgroundColor: "#2c3e50",
-        color: "white",
-        fontSize: "22px",
-        fontWeight: "bold",
-        position: "sticky",
-        top: 0,
-        left: 0,
-        zIndex: 1000,
-      }}>
-        VyapariBook
-      </div>
-
-      {/* Centered Sign In Box */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "calc(100vh - 70px)", // subtract navbar height
-      }}>
-        <div style={{
-          backgroundColor: "white",
-          padding: "30px",
-          borderRadius: "10px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-          width: "100%",
-          maxWidth: "400px",
-        }}>
-          {/* Your Tabs and Inputs */}
-          <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-            <button style={{ flex: 1, padding: "10px", backgroundColor: "#0066ff", color: "white", border: "none", borderRadius: "6px" }}>
-              Sign In
-            </button>
-            <button style={{ flex: 1, padding: "10px", border: "1px solid #0066ff", borderRadius: "6px", backgroundColor: "white", color: "#0066ff" }}>
-              Sign Up
-            </button>
+    <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
+      <Card className="p-4 shadow" style={{ minWidth: '400px' }}>
+        <h3 className="mb-3 text-center">Sign In</h3>
+        <Form onSubmit={handleLogin}>
+          <Form.Group className="mb-3">
+            <Form.Label>Email</Form.Label>
+            <Form.Control type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </Form.Group>
+          <Form.Group className="mb-4">
+            <Form.Label>Password</Form.Label>
+            <Form.Control type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </Form.Group>
+          <Button variant="primary" type="submit" className="w-100">
+            Login
+          </Button>
+          <div className="text-center mt-3">
+            New here? <a href="/signup">Create Account</a>
           </div>
-
-          <form onSubmit={handleLogin}>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              required
-              style={{ width: "100%", padding: "10px", marginBottom: "10px", borderRadius: "6px", backgroundColor: "#e8f0fe", border: "none" }}
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              required
-              style={{ width: "100%", padding: "10px", marginBottom: "20px", borderRadius: "6px", backgroundColor: "#e8f0fe", border: "none" }}
-            />
-            <button type="submit" style={{ width: "100%", padding: "12px", backgroundColor: "#14833b", color: "white", border: "none", borderRadius: "6px" }}>
-              Sign In
-            </button>
-          </form>
-        </div>
-      </div>
+        </Form>
+      </Card>
     </div>
   );
 };
