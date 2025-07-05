@@ -5,7 +5,7 @@ const cors    = require('cors');
 const mysql   = require('mysql2');
 
 const app = express();
-const PORT = process.env.PORT||3001;
+const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
@@ -15,145 +15,227 @@ const db = mysql.createPool({
   user:     process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-  port:     process.env.DB_PORT||3306
+  port:     process.env.DB_PORT || 3306,
 });
 
-// — CUSTOMERS —
-// Create
-app.post('/api/customers', (req,res)=>{
+// ✅ GET all customers
+app.get('/api/customers', (req, res) => {
+  db.query('SELECT * FROM customers ORDER BY id DESC', (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// ✅ POST a new customer (phone must be unique)
+app.post('/api/customers', (req, res) => {
   const { name, phone, email, address, balance, status } = req.body;
-  const sql=`
-    INSERT INTO customers 
-      (name,phone,email,address,balance,status,totalBilled,totalPaid,outstandingAmount,createdAt)
-    VALUES (?,?,?,?,?,?,?,?,?,NOW())
-  `;
-  db.query(sql,
-    [ name,phone,email,address,balance,status,balance,0,balance ],
-    (err, result)=>{
-      if(err) return res.status(500).json({ error:err.message });
-      res.status(201).json({ id:result.insertId, name,phone,email,address,balance,status,createdAt:new Date().toISOString() });
-  });
-});
-// List
-app.get('/api/customers',(req,res)=>{
-  db.query('SELECT * FROM customers ORDER BY createdAt DESC', (err,rows)=>{
-    if(err) return res.status(500).json({ error:err.message });
-    res.json(rows);
+
+  if (!name || !phone)
+    return res.status(400).json({ error: 'Name and phone are required' });
+
+  // Check for duplicate phone
+  db.query('SELECT id FROM customers WHERE phone = ?', [phone], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (results.length > 0) {
+      return res.status(400).json({ error: 'Phone number already exists' });
+    }
+
+    // Insert new customer
+    const sql = `INSERT INTO customers (name, phone, email, address, balance, status)
+                 VALUES (?, ?, ?, ?, ?, ?)`;
+    db.query(
+      sql,
+      [name, phone, email || null, address || null, balance, status],
+      (err2, result) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        res.status(201).json({ id: result.insertId });
+      }
+    );
   });
 });
 
-// — SUPPLIERS —
-app.post('/api/suppliers',(req,res)=>{
-  const { name, phone, email, amount, status } = req.body;
-  const sql=`INSERT INTO suppliers (name,phone,email,amount,status,createdAt) VALUES (?,?,?,?,?,NOW())`;
-  db.query(sql, [name,phone,email||null,amount,status], (e,r)=>{
-    if(e) return res.status(500).json({ error:e.message });
+// ✅ DELETE a customer by ID
+app.delete('/api/customers/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM customers WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (result.affectedRows === 0)
+      return res.status(404).json({ error: 'Customer not found' });
+
+    res.json({ success: true });
+  });
+});
+
+
+// ✅ Suppliers
+app.post('/api/suppliers', (req, res) => {
+  const { name, phone, email = null, amount = 0, status = 'active' } = req.body;
+  const sql = `
+    INSERT INTO suppliers (name, phone, email, amount, status, createdAt)
+    VALUES (?, ?, ?, ?, ?, NOW())
+  `;
+  db.query(sql, [name, phone, email, amount, status], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
     db.query(
-      'SELECT id,name,phone,email,amount AS balance,status,createdAt FROM suppliers WHERE id=?',
-      [r.insertId],
-      (e2,rows)=>{
-        if(e2) return res.status(500).json({ error:e2.message });
+      'SELECT id, name, phone, email, amount AS balance, status, createdAt FROM suppliers WHERE id = ?',
+      [result.insertId],
+      (err2, rows) => {
+        if (err2) return res.status(500).json({ error: err2.message });
         res.status(201).json(rows[0]);
       }
     );
   });
 });
-app.get('/api/suppliers',(req,res)=>{
-  db.query(
-    'SELECT id,name,phone,email,amount AS balance,status,createdAt FROM suppliers ORDER BY createdAt DESC',
-    (err,rows)=>err ? res.status(500).json({ error:err.message }) : res.json(rows)
+
+app.get('/api/suppliers', (req, res) => {
+  db.query('SELECT id, name, phone, email, amount AS balance, status, createdAt FROM suppliers ORDER BY createdAt DESC',
+    (err, rows) => err ? res.status(500).json({ error: err.message }) : res.json(rows)
   );
 });
 
-// — INVOICES & TRANSACTIONS —
-app.get('/api/invoices',(req,res)=>{
-  db.query('SELECT * FROM invoices',(e,rows)=>{
-    if(e) return res.status(500).json({ error:e.message });
-    res.json(rows.map(r=>({ ...r, items:JSON.parse(r.items) })));
+// ✅ Invoices
+app.get('/api/invoices', (req, res) => {
+  db.query('SELECT * FROM invoices', (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows.map(row => ({ ...row, items: JSON.parse(row.items) })));
   });
 });
-app.post('/api/invoices',(req,res)=>{
-  const { invoiceNumber,customerName,createdAt,dueDate,subtotal,discount,total,status,items,method='Cash',note='' } = req.body;
+
+app.post('/api/invoices', (req, res) => {
+  const { invoiceNumber, customerName, createdAt, dueDate, subtotal, discount, total, status, items, method = 'Cash', note = '' } = req.body;
   db.query(
     `INSERT INTO invoices
-      (invoiceNumber,customerName,createdAt,dueDate,subtotal,discount,total,status,items)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-    [ invoiceNumber,customerName,createdAt,dueDate,subtotal,discount,total,status,JSON.stringify(items) ],
-    (e,r)=>{
-      if(e) return res.status(500).json({ error:e.message });
-      const invoiceId = r.insertId;
-      // also log transaction
+    (invoiceNumber, customerName, createdAt, dueDate, subtotal, discount, total, status, items)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [invoiceNumber, customerName, createdAt, dueDate, subtotal, discount, total, status, JSON.stringify(items)],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      const invoiceId = result.insertId;
+
       db.query(
-        `INSERT INTO transactions (type,name,invoice_id,amount,method,note,created_at)
-         VALUES (?,?,?,?,?,?,NOW())`,
-        ['customer',customerName,invoiceId,total,method,note],
-        (e2)=>{
-          if(e2) return res.status(500).json({ error:'Invoice saved, but transaction failed', details:e2.message });
-          res.status(201).json({ message:'Invoice + transaction saved' });
+        `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+        ['customer', customerName, invoiceId, total, method, note],
+        (err2) => {
+          if (err2) return res.status(500).json({ error: 'Invoice saved, but transaction failed', details: err2.message });
+          res.status(201).json({ message: 'Invoice and transaction saved successfully' });
         }
       );
     }
   );
 });
-app.get('/api/transactions',(req,res)=>{
-  let { type='customers', period='this_month', from, to, q='', page=1, perPage=10 } = req.query;
-  page=Number(page); perPage=Number(perPage);
-  const clauses=['type=?'];
-  const params=[ type==='customers'?'customer':'supplier' ];
-  if(period==='this_month')       clauses.push('MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW())');
-  else if(period==='last_month')  clauses.push('MONTH(created_at)=MONTH(DATE_SUB(NOW(),INTERVAL 1 MONTH)) AND YEAR(created_at)=YEAR(DATE_SUB(NOW(),INTERVAL 1 MONTH))');
-  else if(period==='this_year')   clauses.push('YEAR(created_at)=YEAR(NOW())');
-  else if(period==='custom' && from && to){ clauses.push('created_at BETWEEN ? AND ?'); params.push(from,to); }
-  if(q) { clauses.push('(name LIKE ? OR invoice_id LIKE ?)'); params.push(`%${q}%`,`%${q}%`); }
-  const where = clauses.length?`WHERE ${clauses.join(' AND ')}`:'';
-  const offset=(page-1)*perPage;
-  // count
-  db.query(`SELECT COUNT(*) AS cnt FROM transactions ${where}`, params, (e,cntRows)=>{
-    if(e) return res.status(500).json({ error:e.message });
-    const total=cntRows[0].cnt;
+
+app.post('/api/transactions', (req, res) => {
+  const { type, name, invoiceNumber, amount, method, note, date } = req.body;
+
+  if (!type || !name || !amount || !date)
+    return res.status(400).json({ error: 'type, name, amount, and date are required' });
+
+  const invoiceId = invoiceNumber ? Number(invoiceNumber) : null;
+
+  // ✅ Check if same invoice_id already exists
+  if (invoiceId) {
     db.query(
-      `SELECT id,created_at AS date,type,name,invoice_id AS invoiceNumber,amount,method,note
-       FROM transactions
-       ${where}
-       ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`,
+      'SELECT COUNT(*) AS count FROM transactions WHERE invoice_id = ?',
+      [invoiceId],
+      (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results[0].count > 0) {
+          return res.status(400).json({ error: 'Invoice number already exists in transactions.' });
+        }
+
+        // proceed to insert
+        db.query(
+          `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [type, name, invoiceId, amount, method, note || null, date + ' 00:00:00'],
+          (err2, result) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+            res.status(201).json({ id: result.insertId });
+          }
+        );
+      }
+    );
+  } else {
+    // If no invoiceId, just insert
+    db.query(
+      `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [type, name, null, amount, method, note || null, date + ' 00:00:00'],
+      (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json({ id: result.insertId });
+      }
+    );
+  }
+});
+
+
+// ✅ Get All Transactions (Paginated & Filterable)
+app.get('/api/transactions', (req, res) => {
+  let { q = '', page = 1, perPage = 10 } = req.query;
+  page = Number(page);
+  perPage = Number(perPage);
+  const offset = (page - 1) * perPage;
+
+  const clauses = [];
+  const params = [];
+
+  if (q) {
+    clauses.push('(name LIKE ? OR invoice_id LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`);
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+  db.query(`SELECT COUNT(*) AS count FROM transactions ${where}`, params, (err, countRows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const total = countRows[0].count;
+
+    db.query(
+      `SELECT id, created_at AS date, type, name, invoice_id AS invoiceNumber, amount, method, note
+       FROM transactions ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       [...params, perPage, offset],
-      (e2,rows)=> e2
-        ? res.status(500).json({ error:e2.message })
-        : res.json({ data:rows, total, page, perPage })
+      (err2, rows) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        res.json({ data: rows, total, page, perPage });
+      }
     );
   });
 });
 
-// Create a new transaction
-app.post('/api/transactions', (req, res) => {
-  const { type, name, invoiceNumber, amount, method, note, date } = req.body;
+// ✅ Delete Transaction
+app.delete('/api/transactions/:id', (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM transactions WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.sendStatus(204);
+  });
+});
 
-  if (!type || !name || !amount || !date) {
-    return res.status(400).json({ error: 'type, name, amount, and date are required' });
-  }
+// ✅ Summary for Dashboard
+app.get('/api/transactions/summary', (req, res) => {
+  db.query(`
+    SELECT
+      SUM(CASE WHEN type='gave' THEN amount ELSE 0 END) AS gave,
+      SUM(CASE WHEN type='got' THEN amount ELSE 0 END) AS got
+    FROM transactions
+  `, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const gave = rows[0].gave || 0;
+    const got = rows[0].got || 0;
+    res.json({ gave, got, net: got - gave });
+  });
+});
 
-  const sql = `
-    INSERT INTO transactions
-      (type, name, invoice_id, amount, method, note, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
-  // invoiceNumber may not map directly to invoice_id—look up or allow nullable
-  const invoiceId = invoiceNumber ? Number(invoiceNumber) : null;
-
-  db.query(
-    sql,
-    [type, name, invoiceId, amount, method, note || null, date + ' 00:00:00'],
-    (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: result.insertId });
+// ✅ DB Connection
+app.listen(PORT, () => {
+  db.getConnection((err, conn) => {
+    if (err) console.error('❌ DB Connection Error:', err);
+    else {
+      console.log('✅ DB Connected');
+      conn.release();
     }
-  );
+  });
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
-
-
-db.getConnection((err,conn)=>{
-  if(err) console.error('DB ❌',err);
-  else { console.log('DB ✅ Connected'); conn.release(); }
-});
-app.listen(PORT,()=>console.log(`API listening on http://localhost:${PORT}`));

@@ -82,7 +82,7 @@ const InventoryPage: React.FC = () => {
 
   return (
     <div className="p-4">
-          <h1>🧪 Inventory Test</h1>
+          
       {/* Header */}
       <Row className="align-items-center mb-4">
         <Col><h2 className="text-primary">Inventory</h2></Col>
