@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Auth            from './auth/Auth';
 import Dashboard       from './components/Dashboard';
 import DashboardHome   from './pages/DashboardHome';
+import AddInvoicePage from './pages/AddInvoicePage';
 import CustomersPage   from './pages/CustomersPage';
 import SuppliersPage   from './pages/SuppliersPage';
 import InventoryPage   from './pages/InventoryPage';
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/" element={<Auth onLogin={()=>{/* redirect on success */}} />} />
         <Route path="/dashboard" element={<Dashboard />}>
           <Route index element={<DashboardHome />} />
+          <Route path="invoice" element={<AddInvoicePage />} />
           <Route path="customer" element={<CustomersPage />} />
           <Route path="customers"  element={<CustomersPage />} />
           <Route path="suppliers"  element={<SuppliersPage />} />

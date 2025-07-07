@@ -1,4 +1,4 @@
-""// src/pages/SuppliersPage.tsx
+// src/pages/SuppliersPage.tsx
 import React, { useEffect, useState } from 'react';
 import {
   Plus, Search, ChevronRight, Truck, TrendingUp, Wallet
@@ -27,7 +27,7 @@ export default function SuppliersPage() {
   const [filter, setFilter] = useState<'all' | 'receivable' | 'payable'>('all');
   const [selected, setSelected] = useState<Supplier | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', balance: 0, isPayable: false });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', balance: '', isPayable: false });
   const location = useLocation();
 
   const fetchData = async () => {
@@ -47,15 +47,27 @@ export default function SuppliersPage() {
   useEffect(() => { fetchData(); }, [location.pathname]);
 
   const handleAdd = async () => {
-    if (!form.name || form.phone.length !== 10) {
-      return alert('Name and 10-digit phone are required');
+    const phoneRegex = /^\d{10}$/;
+
+    if (!form.name.trim() || !form.phone.trim() || !form.email.trim()) {
+      return alert('Please fill in all required fields');
     }
+
+    if (!phoneRegex.test(form.phone)) {
+      return alert('Phone number must be exactly 10 digits');
+    }
+
+    const phoneExists = suppliers.some(s => s.phone === form.phone);
+    if (phoneExists) {
+      return alert('Phone number already exists for another supplier');
+    }
+
     const status = form.isPayable ? 'payable' : 'receivable';
     const body = {
-      name: form.name,
-      phone: form.phone,
-      email: form.email,
-      amount: parseFloat(form.balance.toString()),
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      amount: parseFloat(form.balance) || 0,
       status,
     };
 
@@ -65,10 +77,11 @@ export default function SuppliersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+
       if (!res.ok) throw new Error();
 
       setShowModal(false);
-      setForm({ name: '', phone: '', email: '', balance: 0, isPayable: false });
+      setForm({ name: '', phone: '', email: '', balance: '', isPayable: false });
       await fetchData();
     } catch (e) {
       console.error('Add supplier failed:', e);
@@ -93,7 +106,6 @@ export default function SuppliersPage() {
 
   return (
     <div className="p-4">
-      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="fw-bold text-primary">Suppliers</h3>
         <Button variant="primary" onClick={() => setShowModal(true)}>
@@ -101,7 +113,6 @@ export default function SuppliersPage() {
         </Button>
       </div>
 
-      {/* Summary Cards */}
       <Row className="g-3 mb-4">
         {[{
           title: 'Total Receivable', value: formatINR(totalReceivable), color: 'success', icon: <TrendingUp />
@@ -126,7 +137,6 @@ export default function SuppliersPage() {
         ))}
       </Row>
 
-      {/* Filter & Search */}
       <div className="d-flex flex-wrap gap-3 align-items-center mb-4">
         <InputGroup style={{ maxWidth: 300 }}>
           <InputGroup.Text><Search size={16} /></InputGroup.Text>
@@ -147,7 +157,6 @@ export default function SuppliersPage() {
         </Form.Select>
       </div>
 
-      {/* List + Detail */}
       <Row>
         <Col md={7}>
           <Card className="shadow-sm">
@@ -198,7 +207,6 @@ export default function SuppliersPage() {
         </Col>
       </Row>
 
-      {/* Modal */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Add Supplier</Modal.Title>
@@ -223,7 +231,12 @@ export default function SuppliersPage() {
               </Col>
               <Col md={6}>
                 <Form.Group><Form.Label>Balance</Form.Label>
-                  <Form.Control type="number" value={form.balance} onChange={e => setForm({ ...form, balance: parseFloat(e.target.value) || 0 })} />
+                  <Form.Control type="text" value={form.balance} onChange={e => {
+                    const v = e.target.value;
+                    if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                      setForm(prev => ({ ...prev, balance: v }));
+                    }
+                  }} />
                 </Form.Group>
               </Col>
             </Row>

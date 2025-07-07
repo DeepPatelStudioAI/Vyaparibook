@@ -237,35 +237,47 @@ const InventoryPage: React.FC = () => {
                 </Form.Group>
               </Col>
               <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Base Price</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={form.basePrice}
-                    onChange={e => setForm({ ...form, basePrice: +e.target.value })}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Cost Price</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={form.costPrice}
-                    onChange={e => setForm({ ...form, costPrice: +e.target.value })}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Stock Qty</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={form.stockQuantity}
-                    onChange={e => setForm({ ...form, stockQuantity: +e.target.value })}
-                  />
-                </Form.Group>
-              </Col>
+  <Form.Group>
+    <Form.Label>Base Price</Form.Label>
+    <Form.Control
+      type="number"
+      value={form.basePrice === undefined ? '' : form.basePrice}
+      onChange={(e) => {
+        const val = e.target.value;
+        setForm({ ...form, basePrice: val === '' ? undefined : +val });
+      }}
+    />
+  </Form.Group>
+</Col>
+
+<Col md={4}>
+  <Form.Group>
+    <Form.Label>Cost Price</Form.Label>
+    <Form.Control
+      type="number"
+      value={form.costPrice === undefined ? '' : form.costPrice}
+      onChange={(e) => {
+        const val = e.target.value;
+        setForm({ ...form, costPrice: val === '' ? undefined : +val });
+      }}
+    />
+  </Form.Group>
+</Col>
+
+<Col md={4}>
+  <Form.Group>
+    <Form.Label>Stock Qty</Form.Label>
+    <Form.Control
+      type="number"
+      value={form.stockQuantity === undefined ? '' : form.stockQuantity}
+      onChange={(e) => {
+        const val = e.target.value;
+        setForm({ ...form, stockQuantity: val === '' ? undefined : +val });
+      }}
+    />
+  </Form.Group>
+</Col>
+
             </Row>
           </Form>
         </Modal.Body>

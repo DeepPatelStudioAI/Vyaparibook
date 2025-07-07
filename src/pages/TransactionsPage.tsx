@@ -330,8 +330,10 @@ export default function TransactionsPage() {
               <Form.Label>Amount</Form.Label>
               <Form.Control
                 type="number"
-                value={newTx.amount || 0}
-                onChange={e => setNewTx(tx => ({ ...tx, amount: Number(e.target.value) }))}
+                value={newTx.amount === undefined ? '' : newTx.amount}
+                onChange={e => setNewTx(tx => ({
+                  ...tx,
+                  amount: e.target.value === '' ? undefined : Number(e.target.value)}))}
               />
             </Form.Group>
             <Form.Group className="mb-2">
