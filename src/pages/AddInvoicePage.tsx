@@ -1,180 +1,213 @@
 // src/pages/AddInvoicePage.tsx
-import React, { useEffect, useState } from 'react';
-import { Button, Card, Col, Form, InputGroup, Row, Table } from 'react-bootstrap';
-import { formatCurrency, formatDate } from '../utils/format';
-import { Invoice, Customer, InvoiceItem } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { Customer, InvoiceItem } from '../types';
+import { formatCurrency } from '../utils/format';
 
-export default function AddInvoicePage() {
+const AddInvoicePage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [items, setItems] = useState<InvoiceItem[]>([
-    { productName: '', quantity: 1, unitPrice: 0, total: 0 }
-  ]);
-  const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [createdAt, setCreatedAt] = useState(new Date().toISOString().slice(0,10));
-  const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0,10));
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`);
+  const [createdAt, setCreatedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState(new Date(Date.now() + 30*86400000).toISOString().slice(0,10));
   const [discount, setDiscount] = useState(0);
-  const [status, setStatus] = useState<'draft'|'sent'|'paid'|'overdue'>('draft');
-  const [method, setMethod] = useState<'Cash'|'UPI'|'Card'|'Online'>('Cash');
+  const [items, setItems] = useState<InvoiceItem[]>([{ productName: '', quantity: 1, unitPrice: 0, total: 0 }]);
   const [note, setNote] = useState('');
+  const invoiceRef = useRef<HTMLDivElement>(null);
 
-  // fetch customer list
   useEffect(() => {
     fetch('http://localhost:3001/api/customers')
-      .then(r => r.json())
+      .then(res => res.json())
       .then(setCustomers)
       .catch(console.error);
   }, []);
 
-  // recalc line totals
   const updateItem = (idx: number, changes: Partial<InvoiceItem>) => {
-    setItems(prev => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], ...changes };
-      next[idx].total = next[idx].quantity * next[idx].unitPrice;
-      return next;
-    });
+    const next = [...items];
+    next[idx] = { ...next[idx], ...changes };
+    next[idx].total = next[idx].quantity * next[idx].unitPrice;
+    setItems(next);
   };
 
-  const addRow = () => setItems(prev => [...prev, { productName:'', quantity:1, unitPrice:0, total:0 }]);
-  const removeRow = (i: number) => setItems(prev => prev.filter((_,j) => j !== i));
+  const addRow = () => setItems([...items, { productName: '', quantity: 1, unitPrice: 0, total: 0 }]);
+  const removeRow = (idx: number) => setItems(items.filter((_, i) => i !== idx));
 
-  const subtotal = items.reduce((s,i) => s + i.total, 0);
+  const subtotal = items.reduce((sum, i) => sum + i.total, 0);
   const total = subtotal - discount;
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
-  const handleSubmit = async () => {
-    if (!invoiceNumber || !customerName) {
-      return alert('Invoice # and Customer are required');
-    }
-    const payload: Invoice = {
-      invoiceNumber,
-      customerName,
-      createdAt,
-      dueDate,
-      subtotal,
-      discount,
-      total,
-      status,
-      items,
-      method,
-      note
-    };
-    try {
-      const res = await fetch('http://localhost:3001/api/invoices', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw await res.text();
-      alert('Invoice created');
-      // reset
-      setInvoiceNumber(''); setCustomerName(''); setItems([{ productName:'',quantity:1,unitPrice:0,total:0 }]);
-    } catch (err:any) {
-      alert('Failed to create invoice:\n' + err);
-    }
+  const handlePDFDownload = async () => {
+    if (!invoiceRef.current) return;
+    const canvas = await html2canvas(invoiceRef.current, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    pdf.addImage(imgData, 'PNG', 10, 10, 190, 0);
+    pdf.save(`${invoiceNumber}.pdf`);
   };
 
   return (
-    <div className="p-4">
-      <h2 className="mb-4">Create New Invoice</h2>
-      <Card className="mb-4 p-3">
-        <Row className="g-2 mb-3">
-          <Col md={3}>
-            <Form.Label>Invoice #</Form.Label>
-            <Form.Control value={invoiceNumber} onChange={e=>setInvoiceNumber(e.target.value)} />
-          </Col>
-          <Col md={3}>
-            <Form.Label>Customer</Form.Label>
-            <Form.Select value={customerName} onChange={e=>setCustomerName(e.target.value)}>
-              <option value="">Select…</option>
-              {customers.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
-            </Form.Select>
-          </Col>
-          <Col md={3}>
-            <Form.Label>Date</Form.Label>
-            <Form.Control type="date" value={createdAt} onChange={e=>setCreatedAt(e.target.value)} />
-          </Col>
-          <Col md={3}>
-            <Form.Label>Due Date</Form.Label>
-            <Form.Control type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} />
-          </Col>
-        </Row>
+    <div className="p-4 bg-gray-50 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-3xl font-bold text-blue-800">VyapariBook Invoice</h2>
+        <button
+          onClick={handlePDFDownload}
+          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg shadow"
+        >
+          Download PDF
+        </button>
+      </div>
 
-        <Table bordered size="sm">
-          <thead>
-            <tr>
-              <th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((row,i)=>(
-              <tr key={i}>
-                <td>
-                  <Form.Control
-                    value={row.productName}
-                    onChange={e=>updateItem(i,{productName:e.target.value})}
-                  />
-                </td>
-                <td>
-                  <Form.Control
-                    type="number"
-                    value={row.quantity}
-                    onChange={e=>updateItem(i,{quantity:+e.target.value})}
-                  />
-                </td>
-                <td>
-                  <Form.Control
-                    type="number"
-                    value={row.unitPrice}
-                    onChange={e=>updateItem(i,{unitPrice:+e.target.value})}
-                  />
-                </td>
-                <td>{formatCurrency(row.total)}</td>
-                <td>
-                  <Button size="sm" variant="outline-danger" onClick={()=>removeRow(i)}>×</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-        <Button size="sm" onClick={addRow}>+ Add Item</Button>
-
-        <Row className="mt-3 g-2">
-          <Col md={3}>
-            <Form.Label>Status</Form.Label>
-            <Form.Select value={status} onChange={e=>setStatus(e.target.value as any)}>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
-            </Form.Select>
-          </Col>
-          <Col md={3}>
-            <Form.Label>Payment Method</Form.Label>
-            <Form.Select value={method} onChange={e=>setMethod(e.target.value as any)}>
-              <option>Cash</option><option>UPI</option><option>Card</option><option>Online</option>
-            </Form.Select>
-          </Col>
-          <Col md={3}>
-            <Form.Label>Discount</Form.Label>
-            <Form.Control
-              type="number"
-              value={discount}
-              onChange={e=>setDiscount(+e.target.value)}
+      <div ref={invoiceRef} className="bg-white p-6 rounded-lg shadow">
+        {/* Header Info */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-semibold">Invoice #</label>
+            <input
+              type="text"
+              value={invoiceNumber}
+              onChange={e => setInvoiceNumber(e.target.value)}
+              className="w-full border rounded px-3 py-2"
             />
-          </Col>
-          <Col md={3}>
-            <Form.Label>Note</Form.Label>
-            <Form.Control value={note} onChange={e=>setNote(e.target.value)} />
-          </Col>
-        </Row>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold">Customer</label>
+            <select
+              value={selectedCustomerId}
+              onChange={e => setSelectedCustomerId(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+            >
+              <option value="">-- Select Customer --</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {selectedCustomer && (
+              <div className="mt-2 text-gray-600 text-sm space-y-1">
+                <div>{selectedCustomer.email}</div>
+                <div>{selectedCustomer.phone}</div>
+                <div>{selectedCustomer.address}</div>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-semibold">Date</label>
+              <input
+                type="date"
+                value={createdAt}
+                onChange={e => setCreatedAt(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-semibold">Due Date</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+          </div>
+        </div>
 
-        <Card className="mt-4 p-3 text-end">
-          <h5>Subtotal: {formatCurrency(subtotal)}</h5>
-          <h5>Total: {formatCurrency(total)}</h5>
-          <Button onClick={handleSubmit}>Save Invoice</Button>
-        </Card>
-      </Card>
+        {/* Items Table */}
+        <div className="overflow-x-auto mb-4">
+          <table className="w-full border-collapse">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border p-2 text-left">Product</th>
+                <th className="border p-2 text-center">Qty</th>
+                <th className="border p-2 text-right">Unit Price</th>
+                <th className="border p-2 text-right">Total</th>
+                <th className="border p-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="border p-2">
+                    <input
+                      className="w-full border rounded px-2 py-1"
+                      placeholder="Product name"
+                      value={item.productName}
+                      onChange={e => updateItem(i, { productName: e.target.value })}
+                    />
+                  </td>
+                  <td className="border p-2 text-center">
+                    <input
+                      type="number"
+                      className="w-16 border rounded px-2 py-1"
+                      value={item.quantity}
+                      min={1}
+                      onChange={e => updateItem(i, { quantity: +e.target.value })}
+                    />
+                  </td>
+                  <td className="border p-2 text-right">
+                    <input
+                      type="number"
+                      className="w-24 border rounded px-2 py-1 text-right"
+                      value={item.unitPrice}
+                      step="0.01"
+                      onChange={e => updateItem(i, { unitPrice: +e.target.value })}
+                    />
+                  </td>
+                  <td className="border p-2 text-right font-medium">{formatCurrency(item.total)}</td>
+                  <td className="border p-2 text-center">
+                    <button
+                      onClick={() => removeRow(i)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button onClick={addRow} className="text-blue-600 hover:underline text-sm mb-4">+ Add Item</button>
+
+        {/* Totals */}
+        <div className="flex justify-end">
+          <div className="w-full md:w-1/3 bg-gray-50 p-4 rounded">
+            <div className="flex justify-between pb-2">
+              <span className="font-semibold">Subtotal:</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            <div className="flex justify-between items-center pb-2">
+              <span className="font-semibold">Discount:</span>
+              <input
+                type="number"
+                className="w-24 border rounded px-2 py-1 text-right"
+                value={discount}
+                onChange={e => setDiscount(+e.target.value)}
+              />
+            </div>
+            <div className="flex justify-between pt-2 border-t font-bold text-lg">
+              <span>Total:</span>
+              <span>{formatCurrency(total)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Note */}
+        <div className="mt-6">
+          <label className="block text-sm font-semibold mb-1">Note:</label>
+          <textarea
+            className="w-full border rounded px-3 py-2"
+            rows={3}
+            placeholder="Additional notes..."
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+        </div>
+
+        <p className="text-center text-xs text-gray-500 italic mt-6">Thank you for using VyapariBook. Payment is due within 30 days.</p>
+      </div>
     </div>
   );
-}
+};
+
+export default AddInvoicePage;
