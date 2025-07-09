@@ -8,11 +8,13 @@ import { formatCurrency } from '../utils/format';
 const AddInvoicePage: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
   const [createdAt, setCreatedAt] = useState(new Date().toISOString().slice(0, 10));
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 30*86400000).toISOString().slice(0,10));
+  const [dueDate, setDueDate] = useState(new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
   const [discount, setDiscount] = useState(0);
-  const [items, setItems] = useState<InvoiceItem[]>([{ productName: '', quantity: 1, unitPrice: 0, total: 0 }]);
+  const [items, setItems] = useState<InvoiceItem[]>([
+    { productName: '', quantity: 1, unitPrice: 0, total: 0 }
+  ]);
   const [note, setNote] = useState('');
   const invoiceRef = useRef<HTMLDivElement>(null);
 
@@ -20,6 +22,11 @@ const AddInvoicePage: React.FC = () => {
     fetch('http://localhost:3001/api/customers')
       .then(res => res.json())
       .then(setCustomers)
+      .catch(console.error);
+
+    fetch('http://localhost:3001/api/invoices/next-number')
+      .then(res => res.json())
+      .then(data => setInvoiceNumber(`INV-${data.nextInvoiceNumber}`))
       .catch(console.error);
   }, []);
 
@@ -47,9 +54,9 @@ const AddInvoicePage: React.FC = () => {
   };
 
   return (
-    <div className="p-4 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-blue-800">VyapariBook Invoice</h2>
+        <h2 className="text-3xl font-bold text-blue-800">Create Invoice</h2>
         <button
           onClick={handlePDFDownload}
           className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg shadow"
@@ -58,20 +65,19 @@ const AddInvoicePage: React.FC = () => {
         </button>
       </div>
 
-      <div ref={invoiceRef} className="bg-white p-6 rounded-lg shadow">
-        {/* Header Info */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div ref={invoiceRef} className="bg-white p-6 rounded-xl shadow-md">
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-semibold">Invoice #</label>
+            <label className="text-sm font-semibold block mb-1">Invoice #</label>
             <input
               type="text"
               value={invoiceNumber}
-              onChange={e => setInvoiceNumber(e.target.value)}
-              className="w-full border rounded px-3 py-2"
+              readOnly
+              className="w-full border rounded px-3 py-2 bg-gray-100"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold">Customer</label>
+            <label className="text-sm font-semibold block mb-1">Customer</label>
             <select
               value={selectedCustomerId}
               onChange={e => setSelectedCustomerId(e.target.value)}
@@ -83,16 +89,16 @@ const AddInvoicePage: React.FC = () => {
               ))}
             </select>
             {selectedCustomer && (
-              <div className="mt-2 text-gray-600 text-sm space-y-1">
+              <div className="mt-2 text-sm text-gray-600 space-y-1">
                 <div>{selectedCustomer.email}</div>
                 <div>{selectedCustomer.phone}</div>
                 <div>{selectedCustomer.address}</div>
               </div>
             )}
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-sm font-semibold">Date</label>
+              <label className="text-sm font-semibold block mb-1">Date</label>
               <input
                 type="date"
                 value={createdAt}
@@ -101,7 +107,7 @@ const AddInvoicePage: React.FC = () => {
               />
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-semibold">Due Date</label>
+              <label className="text-sm font-semibold block mb-1">Due Date</label>
               <input
                 type="date"
                 value={dueDate}
@@ -112,9 +118,8 @@ const AddInvoicePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Items Table */}
         <div className="overflow-x-auto mb-4">
-          <table className="w-full border-collapse">
+          <table className="w-full border text-sm">
             <thead className="bg-gray-100">
               <tr>
                 <th className="border p-2 text-left">Product</th>
@@ -138,7 +143,7 @@ const AddInvoicePage: React.FC = () => {
                   <td className="border p-2 text-center">
                     <input
                       type="number"
-                      className="w-16 border rounded px-2 py-1"
+                      className="w-16 border rounded px-2 py-1 text-center"
                       value={item.quantity}
                       min={1}
                       onChange={e => updateItem(i, { quantity: +e.target.value })}
@@ -158,20 +163,21 @@ const AddInvoicePage: React.FC = () => {
                     <button
                       onClick={() => removeRow(i)}
                       className="text-red-500 hover:text-red-700"
-                    >
-                      ×
-                    </button>
+                    >×</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <button onClick={addRow} className="text-blue-600 hover:underline text-sm mb-4">+ Add Item</button>
 
-        {/* Totals */}
+        <button
+          onClick={addRow}
+          className="text-blue-600 hover:underline text-sm mb-4"
+        >+ Add Item</button>
+
         <div className="flex justify-end">
-          <div className="w-full md:w-1/3 bg-gray-50 p-4 rounded">
+          <div className="w-full md:w-1/3 bg-gray-100 p-4 rounded">
             <div className="flex justify-between pb-2">
               <span className="font-semibold">Subtotal:</span>
               <span>{formatCurrency(subtotal)}</span>
@@ -192,7 +198,6 @@ const AddInvoicePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Note */}
         <div className="mt-6">
           <label className="block text-sm font-semibold mb-1">Note:</label>
           <textarea
@@ -204,7 +209,9 @@ const AddInvoicePage: React.FC = () => {
           />
         </div>
 
-        <p className="text-center text-xs text-gray-500 italic mt-6">Thank you for using VyapariBook. Payment is due within 30 days.</p>
+        <p className="text-center text-xs text-gray-500 italic mt-6">
+          Thank you for using VyapariBook. Payment is due within 30 days.
+        </p>
       </div>
     </div>
   );

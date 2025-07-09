@@ -4,6 +4,7 @@ const express = require('express');
 const cors    = require('cors');
 const mysql   = require('mysql2');
 
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -92,6 +93,18 @@ app.get('/api/suppliers', (req, res) => {
     (err, rows) => err ? res.status(500).json({ error: err.message }) : res.json(rows)
   );
 });
+
+// ✅ DELETE a supplier by ID
+app.delete('/api/suppliers/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM suppliers WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (result.affectedRows === 0)
+      return res.status(404).json({ error: 'Supplier not found' });
+    res.json({ success: true });
+  });
+});
+
 
 // ✅ Invoices
 app.get('/api/invoices', (req, res) => {
