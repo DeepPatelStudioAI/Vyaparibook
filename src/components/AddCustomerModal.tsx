@@ -62,8 +62,8 @@ const AddCustomerModal: React.FC<Props> = ({ show, onClose, onSubmit }) => {
           <input type="text" name="fake-hidden" autoComplete="username" style={{ display: 'none' }} />
 
           <Row className="g-2">
-            <Col md={6}>
-              <Form.Group>
+          <Col md={6}>
+            <Form.Group>
                 <Form.Label>Name</Form.Label>
                 <Form.Control
                   type="text"
@@ -72,10 +72,10 @@ const AddCustomerModal: React.FC<Props> = ({ show, onClose, onSubmit }) => {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group>
                 <Form.Label>Phone</Form.Label>
                 <Form.Control
                   type="text"
@@ -90,8 +90,8 @@ const AddCustomerModal: React.FC<Props> = ({ show, onClose, onSubmit }) => {
                     })
                   }
                 />
-              </Form.Group>
-            </Col>
+            </Form.Group>
+          </Col>
             <Col md={6}>
               <Form.Group>
                 <Form.Label>Email</Form.Label>
@@ -102,7 +102,7 @@ const AddCustomerModal: React.FC<Props> = ({ show, onClose, onSubmit }) => {
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
-              </Form.Group>
+                 </Form.Group>
             </Col>
             <Col md={6}>
               <Form.Group>
