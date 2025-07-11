@@ -1,7 +1,9 @@
+// backend/index.js
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const mysql = require('mysql2');
+const cors    = require('cors');
+const mysql   = require('mysql2');
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -10,14 +12,13 @@ app.use(cors());
 app.use(express.json());
 
 const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
+  host:     process.env.DB_HOST,
+  user:     process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
+  port:     process.env.DB_PORT || 3306,
 });
 
-// Generate next invoice number (starts from 1001)
 const getNextInvoiceNumber = (cb) => {
   db.query('SELECT MAX(invoiceNumber) AS max FROM invoices', (err, result) => {
     if (err) return cb(err);
@@ -26,7 +27,7 @@ const getNextInvoiceNumber = (cb) => {
   });
 };
 
-// 🟢 GET all customers
+// ✅ GET all customers
 app.get('/api/customers', (req, res) => {
   db.query('SELECT id, name, phone, email, address, balance, status, createdAt, invoiceNumber FROM customers', (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -34,7 +35,7 @@ app.get('/api/customers', (req, res) => {
   });
 });
 
-// 🟢 POST new customer and auto-create invoice + transaction
+// ✅ POST a new customer (phone must be unique)
 app.post('/api/customers', (req, res) => {
   const { name, phone, email, address, balance, status } = req.body;
   const createdAt = new Date();
@@ -50,12 +51,14 @@ app.post('/api/customers', (req, res) => {
       getNextInvoiceNumber((err, nextInvoiceNo) => {
         if (err) return res.status(500).json({ error: 'Invoice number fetch failed' });
 
+        // Insert invoice
         db.query(
           'INSERT INTO invoices (invoiceNumber, customerId) VALUES (?, ?)',
           [nextInvoiceNo, customerId],
           (err2) => {
             if (err2) return res.status(500).json({ error: 'Invoice insert failed' });
 
+            // ✅ Insert matching transaction
             db.query(
               `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
                VALUES (?, ?, ?, ?, ?, ?, NOW())`,
@@ -80,18 +83,22 @@ app.post('/api/customers', (req, res) => {
   );
 });
 
-// 🟢 DELETE a customer
+
+
+// ✅ DELETE a customer by ID
 app.delete('/api/customers/:id', (req, res) => {
   const id = req.params.id;
   db.query('DELETE FROM customers WHERE id = ?', [id], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
     if (result.affectedRows === 0)
       return res.status(404).json({ error: 'Customer not found' });
+
     res.json({ success: true });
   });
 });
 
-// 🟢 SUPPLIERS
+
+// ✅ Suppliers
 app.post('/api/suppliers', (req, res) => {
   const { name, phone, email = null, amount = 0, status = 'active' } = req.body;
   const sql = `
@@ -117,6 +124,7 @@ app.get('/api/suppliers', (req, res) => {
   );
 });
 
+// ✅ DELETE a supplier by ID
 app.delete('/api/suppliers/:id', (req, res) => {
   const id = req.params.id;
   db.query('DELETE FROM suppliers WHERE id = ?', [id], (err, result) => {
@@ -127,7 +135,8 @@ app.delete('/api/suppliers/:id', (req, res) => {
   });
 });
 
-// 🟢 GET next invoice number
+
+// ✅ Invoices
 app.get('/api/invoices/next-number', (req, res) => {
   const sql = 'SELECT MAX(invoiceNumber) AS maxInv FROM invoices';
   db.query(sql, (err, rows) => {
@@ -138,17 +147,16 @@ app.get('/api/invoices/next-number', (req, res) => {
   });
 });
 
-// 🟢 POST invoice + transaction
 app.post('/api/invoices', (req, res) => {
   const { invoiceNumber, customerName, createdAt, dueDate, subtotal, discount, total, status, items, method = 'Cash', note = '' } = req.body;
-  db.query(
+    db.query(
     `INSERT INTO invoices
-     (invoiceNumber, customerName, createdAt, dueDate, subtotal, discount, total, status, items)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [invoiceNumber, customerName, createdAt, dueDate, subtotal, discount, total, status, JSON.stringify(items)],
+    (invoiceNumber, customerName, createdAt, dueDate, subtotal, discount, total, status, items)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [invoiceNumber, customerName, createdAt, dueDate, subtotal, discount, total, status, JSON.stringify(items)],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
-      const invoiceId = result.insertId;
+        const invoiceId = result.insertId;
 
       db.query(
         `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
@@ -163,14 +171,15 @@ app.post('/api/invoices', (req, res) => {
   );
 });
 
-// 🟢 POST new transaction
 app.post('/api/transactions', (req, res) => {
   const { type, name, invoiceNumber, amount, method, note, date } = req.body;
+
   if (!type || !name || !amount || !date)
     return res.status(400).json({ error: 'type, name, amount, and date are required' });
 
   const invoiceId = invoiceNumber ? Number(invoiceNumber) : null;
 
+  // ✅ Check if same invoice_id already exists
   if (invoiceId) {
     db.query(
       'SELECT COUNT(*) AS count FROM transactions WHERE invoice_id = ?',
@@ -181,6 +190,7 @@ app.post('/api/transactions', (req, res) => {
           return res.status(400).json({ error: 'Invoice number already exists in transactions.' });
         }
 
+        // proceed to insert
         db.query(
           `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -193,6 +203,7 @@ app.post('/api/transactions', (req, res) => {
       }
     );
   } else {
+    // If no invoiceId, just insert
     db.query(
       `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -205,7 +216,8 @@ app.post('/api/transactions', (req, res) => {
   }
 });
 
-// 🟢 GET transactions (paginated, filtered)
+
+// ✅ Get All Transactions (Paginated & Filterable)
 app.get('/api/transactions', (req, res) => {
   let { q = '', page = 1, perPage = 10 } = req.query;
   page = Number(page);
@@ -238,7 +250,25 @@ app.get('/api/transactions', (req, res) => {
   });
 });
 
-// 🟢 DELETE transaction
+app.post('/api/transactions', (req, res) => {
+  const { type, name, invoiceNumber, amount, method, note, date } = req.body;
+  if (!type || !name || !amount || !date)
+    return res.status(400).json({ error: 'type, name, amount, and date are required' });
+
+  const invoiceId = invoiceNumber ? Number(invoiceNumber) : null;
+
+  const insertQuery = `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+  db.query(insertQuery,
+    [type, name, invoiceId || null, amount, method, note || null, date + ' 00:00:00'],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.status(201).json({ id: result.insertId });
+    }
+  );
+});
+
 app.delete('/api/transactions/:id', (req, res) => {
   const { id } = req.params;
   db.query('DELETE FROM transactions WHERE id = ?', [id], (err, result) => {
@@ -247,7 +277,7 @@ app.delete('/api/transactions/:id', (req, res) => {
   });
 });
 
-// 🟢 Dashboard summary
+// ✅ Dashboard Summary
 app.get('/api/transactions/summary', (req, res) => {
   db.query(`
     SELECT
@@ -262,7 +292,7 @@ app.get('/api/transactions/summary', (req, res) => {
   });
 });
 
-// 🟢 Start the server
+// ✅ Start Server
 app.listen(PORT, () => {
   db.getConnection((err, conn) => {
     if (err) console.error('❌ DB Connection Error:', err);
