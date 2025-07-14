@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-// import { Card } from '@/components/ui/card';
+import { Card } from 'react-bootstrap';
 import { 
   LayoutDashboard, 
   Users, 
@@ -15,14 +15,12 @@ const Navigation = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/customers', label: 'Customers', icon: Users },
-    { path: '/suppliers', label: 'Suppliers', icon: Truck },
-    { path: '/expenses', label: 'Expenses', icon: Receipt },
-    { path: '/cashbook', label: 'Cashbook', icon: CreditCard },
-    { path: '/reports', label: 'Reports', icon: FileText },
-    // ← Added this line for Transactions
-    { path: '/transactions', label: 'Transactions', icon: Activity },
+    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/dashboard/customers', label: 'Customers', icon: Users },
+    { path: '/dashboard/suppliers', label: 'Suppliers', icon: Truck },
+    { path: '/dashboard/inventory', label: 'Inventory', icon: Receipt },
+    { path: '/dashboard/transactions', label: 'Transactions', icon: CreditCard },
+    { path: '/dashboard/reports', label: 'Reports', icon: FileText },
   ];
 
   return (

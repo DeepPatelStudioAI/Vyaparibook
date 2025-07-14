@@ -1,25 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-type User = { name: string; email: string; password: string };
-
-interface AuthProps {
-  onLogin: (name: string) => void;
-}
-
-const Auth: React.FC<AuthProps> = ({ onLogin }) => {
+const Auth: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [users, setUsers] = useState<User[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const stored = localStorage.getItem('vyapariUsers');
-    if (stored) setUsers(JSON.parse(stored));
-  }, []);
+  const { login, signup } = useAuth();
 
   const reset = () => {
     setName('');
@@ -32,18 +22,20 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     e.preventDefault();
     if (mode === 'signup') {
       if (password !== confirm) return alert('Passwords must match');
-      if (users.some(u => u.email === email)) return alert('Email already registered');
-      const newUser = [...users, { name, email, password }];
-      setUsers(newUser);
-      localStorage.setItem('vyapariUsers', JSON.stringify(newUser));
+      
+      const success = signup(name, email, password);
+      if (!success) {
+        return alert('Email already registered');
+      }
+      
       alert('Sign-up successful! Please sign in.');
       setMode('signin');
       reset();
     } else {
-      const found = users.find(u => u.email === email);
-      if (!found) return alert('No account found.');
-      if (found.password !== password) return alert('Incorrect password.');
-      onLogin(found.name);
+      const success = login(email, password);
+      if (!success) {
+        return alert('Invalid email or password.');
+      }
       navigate('/dashboard');
     }
   };

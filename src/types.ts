@@ -7,7 +7,7 @@ export interface Customer {
     email: string;
     address?: string;
     balance: number;
-    status: 'Receivable' | 'payable';
+    status: 'receivable' | 'payable';
     createdAt: string;
     totalPaid?: number; // Optional, for dashboard
     outstandingAmount?: number; // Optional, for dashboard
@@ -23,6 +23,13 @@ export interface Customer {
     createdAt: string;
   }
   
+export interface Transaction {
+    id: number;
+    created_at: string;
+    type: 'got' | 'gave';
+    invoiceNumber: number;
+    amount: number;
+  }
   export interface Product {
     id: number;
     name: string;

@@ -1,18 +1,14 @@
 // src/components/Dashboard.tsx
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-
-  React.useEffect(() => {
-    const storedUsers = localStorage.getItem('vyapariUsers');
-    if (!storedUsers || !JSON.parse(storedUsers).length) {
-      navigate('/');
-    }
-  }, [navigate]);
+  const { logout } = useAuth();
 
   const handleLogout = () => {
+    logout();
     alert('Logged out successfully!');
     navigate('/');
   };
@@ -31,7 +27,7 @@ const Dashboard: React.FC = () => {
           <NavLink to="/dashboard/suppliers" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Suppliers</NavLink>
           <NavLink to="/dashboard/inventory" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Inventory</NavLink>
           <NavLink to="/dashboard/transactions" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Transactions</NavLink>
-          <NavLink to="/dashboard/invoice" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Invoice </NavLink>
+          <NavLink to="/dashboard/reports" className={({ isActive }) => `nav-link text-white ${isActive ? 'text-success' : ''}`}>Reports</NavLink>
         </nav>
 
         <button className="btn btn-outline-light w-100 mt-4" onClick={handleLogout}>

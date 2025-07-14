@@ -8,13 +8,13 @@ interface CustomerData {
   email: string;
   address: string;
   balance: number;
-  isReceivable: boolean;
+  status: 'receivable' | 'payable';
 }
 
 interface Props {
   show: boolean;
   onClose: () => void;
-  onSubmit: (data: CustomerData) => void;
+  onSubmit: (data: Omit<CustomerData, 'isReceivable'> & { status: 'receivable' | 'payable' }) => void;
 }
 
 const AddCustomerModal: React.FC<Props> = ({ show, onClose, onSubmit }) => {
@@ -32,12 +32,17 @@ const AddCustomerModal: React.FC<Props> = ({ show, onClose, onSubmit }) => {
   const handleAdd = () => {
     if (!form.name.trim()) return alert('Name is required');
     if (!form.phone.trim()) return alert('Phone is required');
+    if (!form.email.trim().endsWith('.com')) return alert('Email must end with .com');
     const balance = parseFloat(form.balance);
     if (isNaN(balance)) return alert('Invalid balance');
 
     onSubmit({
-      ...form,
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      address: form.address.trim(),
       balance,
+      status: form.isReceivable ? 'receivable' : 'payable',
     });
 
     setForm({
@@ -59,7 +64,7 @@ const AddCustomerModal: React.FC<Props> = ({ show, onClose, onSubmit }) => {
       <Modal.Body>
         <Form autoComplete="off">
           {/* 👇 Hidden input to disable autofill */}
-          <input type="text" name="fake-hidden" autoComplete="username" style={{ display: 'none' }} />
+          <input type="text" name="fake-hidden" title="hidden" autoComplete="username" style={{ display: 'none' }} aria-hidden="true" />
 
           <Row className="g-2">
           <Col md={6}>
