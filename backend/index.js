@@ -1,40 +1,90 @@
 // backend/index.js
 require('dotenv').config();
 const express = require('express');
-const cors    = require('cors');
-const mysql   = require('mysql2');
+const cors = require('cors');
+const mysql = require('mysql2');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// MySQL pool
 const db = mysql.createPool({
-  host:     process.env.DB_HOST,
-  user:     process.env.DB_USER,
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-  port:     process.env.DB_PORT || 3306,
+  port: process.env.DB_PORT || 3306,
 }).promise();
 
+// Helper to get next invoice number
 const getNextInvoiceNumber = async () => {
   const [result] = await db.query('SELECT MAX(invoiceNumber) AS max FROM invoices');
   return (result[0].max || 1000) + 1;
 };
 
+// ✅ Recalculate balance for a customer
+const recalculateCustomerBalance = async (customerId) => {
+  const [rows] = await db.query(
+    `SELECT t.type, t.amount
+     FROM transactions t
+     JOIN invoices i ON t.invoice_id = i.invoiceNumber
+     WHERE i.customerId = ?`,
+    [customerId]
+  );
+
+  let gave = 0;
+  let got = 0;
+
+  rows.forEach(row => {
+    if (row.type === 'gave') gave += parseFloat(row.amount);
+    if (row.type === 'got') got += parseFloat(row.amount);
+  });
+
+  const balance = gave - got;
+
+  await db.query(
+    `UPDATE customers
+     SET balance = ?, status = ?
+     WHERE id = ?`,
+    [
+      balance,
+      balance < 0 ? 'receivable' : balance > 0 ? 'payable' : 'settled',
+      customerId
+    ]
+  );
+};
 
 // ✅ GET all customers
 app.get('/api/customers', async (req, res) => {
   try {
-    const [results] = await db.query('SELECT id, name, phone, email, address, balance, status, createdAt FROM customers');
+    const [results] = await db.query(
+      'SELECT id, name, phone, email, address, balance, status, createdAt FROM customers'
+    );
     res.json(results);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ POST a new customer (phone must be unique)
+// POST /api/customers/:id/transactions
+app.post('/api/customers/:id/transactions', async (req, res) => {
+  const { id } = req.params;
+  const { type, amount, date } = req.body;
+  try {
+    // you may want to generate a new invoice or just use existing invoice_id
+    await db.query(
+      'INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at) VALUES (?, (SELECT name FROM customers WHERE id=?), (SELECT invoiceNumber FROM invoices WHERE customerId=? ORDER BY invoiceNumber DESC LIMIT 1), ?, ?, ?, ?)',
+      [type, id, id, amount, 'Manual', `Manual ${type}`, date]
+    );
+    res.status(201).json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ✅ POST a new customer (auto creates invoice + transaction)
 app.post('/api/customers', async (req, res) => {
   const { name, phone, email, address, balance, status } = req.body;
   const createdAt = new Date();
@@ -44,6 +94,7 @@ app.post('/api/customers', async (req, res) => {
       'INSERT INTO customers (name, phone, email, address, balance, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [name, phone, email, address, balance, status, createdAt]
     );
+
     const customerId = result.insertId;
     const nextInvoiceNo = await getNextInvoiceNumber();
 
@@ -65,15 +116,15 @@ app.post('/api/customers', async (req, res) => {
       ]
     );
 
+    await recalculateCustomerBalance(customerId);
+
     res.status(201).json({ message: 'Customer, Invoice, and Transaction created' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create customer: ' + err.message });
   }
 });
 
-
-
-// ✅ DELETE a customer by ID
+// ✅ DELETE a customer
 app.delete('/api/customers/:id', async (req, res) => {
   const customerId = req.params.id;
 
@@ -94,6 +145,7 @@ app.delete('/api/customers/:id', async (req, res) => {
   }
 });
 
+// ✅ Get all transactions for a customer
 app.get('/api/customers/:id/transactions', async (req, res) => {
   const { id } = req.params;
   try {
@@ -111,35 +163,40 @@ app.get('/api/customers/:id/transactions', async (req, res) => {
   }
 });
 
-// ✅ Suppliers
+// ✅ Add a supplier
 app.post('/api/suppliers', async (req, res) => {
   const { name, phone, email = null, amount = 0, status = 'active' } = req.body;
-  const sql = `
-    INSERT INTO suppliers (name, phone, email, amount, status, createdAt)
-    VALUES (?, ?, ?, ?, ?, NOW())
-  `;
   try {
-    const [result] = await db.query(sql, [name, phone, email, amount, status]);
+    const [result] = await db.query(
+      `INSERT INTO suppliers (name, phone, email, amount, status, createdAt)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [name, phone, email, amount, status]
+    );
+
     const [[newSupplier]] = await db.query(
       'SELECT id, name, phone, email, amount AS balance, status, createdAt FROM suppliers WHERE id = ?',
       [result.insertId]
     );
+
     res.status(201).json(newSupplier);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// ✅ Get all suppliers
 app.get('/api/suppliers', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT id, name, phone, email, amount AS balance, status, createdAt FROM suppliers ORDER BY createdAt DESC');
+    const [rows] = await db.query(
+      'SELECT id, name, phone, email, amount AS balance, status, createdAt FROM suppliers ORDER BY createdAt DESC'
+    );
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ DELETE a supplier by ID
+// ✅ Delete supplier
 app.delete('/api/suppliers/:id', async (req, res) => {
   const id = req.params.id;
   try {
@@ -153,9 +210,46 @@ app.delete('/api/suppliers/:id', async (req, res) => {
   }
 });
 
-// ── TRANSACTIONS ───────────────────────────────────────────────────────────
+// ✅ Get all transactions
 
-// GET all transactions (with invoiceNumber)
+
+// POST a new transaction for a given customer
+app.post('/api/customers/:id/transactions', async (req, res) => {
+  const custId = req.params.id;
+  const { type, amount } = req.body;
+  if (!type || typeof amount !== 'number') {
+    return res.status(400).json({ error: 'Type and amount are required' });
+  }
+
+  try {
+    // Find the most‑recent invoiceNumber for this customer
+    const [[inv]] = await db.query(
+      'SELECT invoiceNumber FROM invoices WHERE customerId = ? ORDER BY invoiceNumber DESC LIMIT 1',
+      [custId]
+    );
+    if (!inv) return res.status(404).json({ error: 'No invoice found for customer' });
+
+    // Insert the new transaction
+    await db.query(
+      `INSERT INTO transactions
+         (type, name, invoice_id, amount, method, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        type,
+        '(manual)',            // you can change this
+        inv.invoiceNumber,
+        amount,
+        'Manual',
+        'Added via edit'
+      ]
+    );
+
+    res.status(201).json({ message: 'Transaction added' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/transactions', async (req, res) => {
   try {
@@ -181,18 +275,32 @@ app.get('/api/transactions', async (req, res) => {
   }
 });
 
-// DELETE transaction
+// ✅ Delete a transaction and update balance
 app.delete('/api/transactions/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM transactions WHERE id = ?', [req.params.id]);
+    const transactionId = req.params.id;
+
+    // Get customerId before deleting
+    const [[tx]] = await db.query(
+      `SELECT i.customerId
+       FROM transactions t
+       JOIN invoices i ON t.invoice_id = i.invoiceNumber
+       WHERE t.id = ?`,
+      [transactionId]
+    );
+
+    if (!tx) return res.status(404).json({ error: "Transaction not found" });
+
+    await db.query('DELETE FROM transactions WHERE id = ?', [transactionId]);
+    await recalculateCustomerBalance(tx.customerId);
+
     res.sendStatus(204);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-
-// ✅ Start Server
+// ✅ Start server
 app.listen(PORT, async () => {
   try {
     const conn = await db.getConnection();
