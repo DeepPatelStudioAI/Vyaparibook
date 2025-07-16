@@ -6,6 +6,7 @@ interface AuthContextType {
   login: (email: string, password: string) => boolean;
   logout: () => void;
   signup: (name: string, email: string, password: string) => boolean;
+  isAuthLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,15 +28,16 @@ interface User {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; email: string } | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true); // 👈
 
   useEffect(() => {
-    // Check if user is logged in on mount
     const loggedInUser = localStorage.getItem('currentUser');
     if (loggedInUser) {
       const user = JSON.parse(loggedInUser);
       setCurrentUser(user);
       setIsAuthenticated(true);
     }
+    setIsAuthLoading(false); // ✅ done loading
   }, []);
 
   const login = (email: string, password: string): boolean => {
@@ -76,7 +78,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, currentUser, login, logout, signup }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        currentUser,
+        login,
+        logout,
+        signup,
+        isAuthLoading // 👈 pass it down
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
