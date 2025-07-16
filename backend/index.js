@@ -23,6 +23,7 @@ const getNextInvoiceNumber = async () => {
   return (result[0].max || 1000) + 1;
 };
 
+
 // ✅ GET all customers
 app.get('/api/customers', async (req, res) => {
   try {
@@ -155,6 +156,7 @@ app.delete('/api/suppliers/:id', async (req, res) => {
 // ── TRANSACTIONS ───────────────────────────────────────────────────────────
 
 // GET all transactions (with invoiceNumber)
+
 app.get('/api/transactions', async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -182,7 +184,7 @@ app.get('/api/transactions', async (req, res) => {
 // DELETE transaction
 app.delete('/api/transactions/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM transactions WHERE id=?', [req.params.id]);
+    await db.query('DELETE FROM transactions WHERE id = ?', [req.params.id]);
     res.sendStatus(204);
   } catch (err) {
     res.status(500).json({ error: err.message });
