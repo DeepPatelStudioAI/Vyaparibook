@@ -17,151 +17,151 @@ const db = mysql.createPool({
   port: process.env.DB_PORT || 3306,
 }).promise();
 
-// Helper to get next invoice number
-const getNextInvoiceNumber = async () => {
-  const [result] = await db.query('SELECT MAX(invoiceNumber) AS max FROM invoices');
-  return (result[0].max || 1000) + 1;
-};
-
-// ✅ Recalculate balance for a customer
-const recalculateCustomerBalance = async (customerId) => {
+// Recalculate a customer’s balance based on transactions
+async function recalcBalance(customerId) {
   const [rows] = await db.query(
     `SELECT t.type, t.amount
      FROM transactions t
-     JOIN invoices i ON t.invoice_id = i.invoiceNumber
+     JOIN invoices i ON t.invoice_id = i.id
      WHERE i.customerId = ?`,
     [customerId]
   );
-
-  let gave = 0;
-  let got = 0;
-
-  rows.forEach(row => {
-    if (row.type === 'gave') gave += parseFloat(row.amount);
-    if (row.type === 'got') got += parseFloat(row.amount);
+  let gave = 0, got = 0;
+  rows.forEach(r => {
+    if (r.type === 'gave') gave += parseFloat(r.amount);
+    if (r.type === 'got') got += parseFloat(r.amount);
   });
-
   const balance = gave - got;
-
+  const status =
+    balance < 0 ? 'receivable' :
+    balance > 0 ? 'payable' :
+    'settled';
   await db.query(
     `UPDATE customers
      SET balance = ?, status = ?
      WHERE id = ?`,
-    [
-      balance,
-      balance < 0 ? 'receivable' : balance > 0 ? 'payable' : 'settled',
-      customerId
-    ]
+    [balance, status, customerId]
   );
-};
+}
 
-// ✅ GET all customers
+// GET all customers
 app.get('/api/customers', async (req, res) => {
   try {
-    const [results] = await db.query(
+    const [rows] = await db.query(
       'SELECT id, name, phone, email, address, balance, status, createdAt FROM customers'
     );
-    res.json(results);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
-// POST /api/customers/:id/transactions
-app.post('/api/customers/:id/transactions', async (req, res) => {
-  const { id } = req.params;
-  const { type, amount, date } = req.body;
-  try {
-    // you may want to generate a new invoice or just use existing invoice_id
-    await db.query(
-      'INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at) VALUES (?, (SELECT name FROM customers WHERE id=?), (SELECT invoiceNumber FROM invoices WHERE customerId=? ORDER BY invoiceNumber DESC LIMIT 1), ?, ?, ?, ?)',
-      [type, id, id, amount, 'Manual', `Manual ${type}`, date]
-    );
-    res.status(201).json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-// ✅ POST a new customer (auto creates invoice + transaction)
+// POST a new customer (and auto-create an empty invoice + initial transaction)
 app.post('/api/customers', async (req, res) => {
   const { name, phone, email, address, balance, status } = req.body;
-  const createdAt = new Date();
-
   try {
-    const [result] = await db.query(
-      'INSERT INTO customers (name, phone, email, address, balance, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, phone, email, address, balance, status, createdAt]
-    );
-
-    const customerId = result.insertId;
-    const nextInvoiceNo = await getNextInvoiceNumber();
-
-    await db.query(
-      'INSERT INTO invoices (invoiceNumber, customerId) VALUES (?, ?)',
-      [nextInvoiceNo, customerId]
-    );
-
-    await db.query(
-      `INSERT INTO transactions (type, name, invoice_id, amount, method, note, created_at)
+    // 1) create customer
+    const [ins] = await db.query(
+      `INSERT INTO customers
+         (name, phone, email, address, balance, status, createdAt)
        VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+      [name, phone, email, address, balance, status]
+    );
+    const customerId = ins.insertId;
+
+    // 2) create an invoice record
+    const [invIns] = await db.query(
+      `INSERT INTO invoices (customerId, total, status, createdAt)
+       VALUES (?, ?, ?, NOW())`,
+      [customerId, balance, status]
+    );
+    const invoiceId = invIns.insertId;
+
+    // 3) create an initial transaction
+    await db.query(
+      `INSERT INTO transactions
+         (type, name, invoice_id, amount, method, note, created_at)
+       VALUES (?, ?, ?, ?, 'Cash', 'Auto on creation', NOW())`,
       [
         status === 'receivable' ? 'got' : 'gave',
         name,
-        nextInvoiceNo,
-        balance,
-        'Cash',
-        'Auto transaction on customer creation'
+        invoiceId,
+        balance
       ]
     );
 
-    await recalculateCustomerBalance(customerId);
-
-    res.status(201).json({ message: 'Customer, Invoice, and Transaction created' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create customer: ' + err.message });
+    // finally recalc
+    await recalcBalance(customerId);
+    res.status(201).json({ message: 'Customer created' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
-// ✅ DELETE a customer
+// DELETE a customer + all their invoices + transactions
 app.delete('/api/customers/:id', async (req, res) => {
-  const customerId = req.params.id;
-
+  const cust = req.params.id;
   try {
-    const [invoiceResults] = await db.query('SELECT invoiceNumber FROM invoices WHERE customerId = ?', [customerId]);
-    const invoiceNumbers = invoiceResults.map(row => row.invoiceNumber);
-
-    if (invoiceNumbers.length > 0) {
-      await db.query('DELETE FROM transactions WHERE invoice_id IN (?)', [invoiceNumbers]);
-      await db.query('DELETE FROM invoices WHERE customerId = ?', [customerId]);
-    }
-
-    await db.query('DELETE FROM customers WHERE id = ?', [customerId]);
-
-    res.json({ message: 'Customer and related data deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete customer: ' + err.message });
-  }
-});
-
-// ✅ Get all transactions for a customer
-app.get('/api/customers/:id/transactions', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [transactions] = await db.query(
-      `SELECT t.id, t.created_at, t.type, i.invoiceNumber, t.amount
-       FROM transactions t
-       JOIN invoices i ON t.invoice_id = i.invoiceNumber
-       WHERE i.customerId = ?
-       ORDER BY t.created_at DESC`,
-      [id]
+    // delete transactions
+    await db.query(
+      'DELETE t FROM transactions t JOIN invoices i ON t.invoice_id = i.id WHERE i.customerId = ?',
+      [cust]
     );
-    res.json(transactions);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch transactions: ' + err.message });
+    // delete invoices
+    await db.query('DELETE FROM invoices WHERE customerId = ?', [cust]);
+    // delete customer
+    await db.query('DELETE FROM customers WHERE id = ?', [cust]);
+    res.json({ message: 'Deleted' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
+
+// GET all transactions for one customer
+app.get('/api/customers/:id/transactions', async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT
+         t.id, t.created_at, t.type, t.amount
+       FROM transactions t
+       JOIN invoices i ON t.invoice_id = i.id
+       WHERE i.customerId = ?
+       ORDER BY t.created_at ASC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST a manual transaction for a customer
+app.post('/api/customers/:id/transactions', async (req, res) => {
+  const cust = req.params.id;
+  const { type, amount, date } = req.body;
+  try {
+    // find the latest invoice for that customer
+    const [[inv]] = await db.query(
+      'SELECT id FROM invoices WHERE customerId = ? ORDER BY id DESC LIMIT 1',
+      [cust]
+    );
+    if (!inv) return res.status(404).json({ error: 'No invoice found' });
+
+    await db.query(
+      `INSERT INTO transactions
+         (type, name, invoice_id, amount, method, note, created_at)
+       VALUES (?, (SELECT name FROM customers WHERE id=?), ?, ?, 'Manual', 'Manual', ?)`,
+      [type, cust, inv.id, amount, date || new Date()]
+    );
+
+    await recalcBalance(cust);
+    res.status(201).json({ message: 'Transaction added' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 
 // ✅ Add a supplier
 app.post('/api/suppliers', async (req, res) => {
