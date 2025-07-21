@@ -1,173 +1,186 @@
 // src/pages/CustomersPage.tsx
-import React, { useEffect, useState, useRef } from "react";
-import {
-  Button,
-  Card,
-  Col,
-  Row,
-  InputGroup,
-  Form,
-  Badge,
-  Spinner,
-  Table,
-  Modal,
-} from "react-bootstrap";
+import React, { useEffect, useState } from "react";
 import {
   Plus,
   Search,
+  ChevronRight,
   Users,
   TrendingUp,
   Wallet,
-  Download,
-  Trash2,
-  Edit2,
 } from "lucide-react";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import AddCustomerModal from "../components/AddCustomerModal";
-import { Customer, Transaction } from "../types";
+import {
+  Modal,
+  Button,
+  Form,
+  Badge,
+  InputGroup,
+  Card,
+  Row,
+  Col,
+} from "react-bootstrap";
+import { useLocation } from "react-router-dom";
 
-const formatINR = (amount: number) =>
+export interface Customer {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  address?: string;
+  balance: number;
+  status: "receivable" | "payable";
+  createdAt: string;
+}
+
+const formatINR = (amount: number): string =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    maximumFractionDigits: 2,
   }).format(amount);
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selected, setSelected] = useState<Customer | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loadingTx, setLoadingTx] = useState(false);
-  const [search, setSearch] = useState("");
-  const [showCustModal, setShowCustModal] = useState(false);
-  const [showTxModal, setShowTxModal] = useState(false);
-  const statementRef = useRef<HTMLDivElement>(null);
-
-  // --- form state for new transaction ---
-  const [txType, setTxType] = useState<"got" | "gave">("got");
-  const [txAmount, setTxAmount] = useState<number>(0);
-  const [txDate, setTxDate] = useState<string>(
-    new Date().toISOString().slice(0, 10)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState<"all" | "receivable" | "payable">(
+    "all"
   );
+  const [selected, setSelected] = useState<Customer | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const location = useLocation();
 
-  // --- fetch customers ---
-  const fetchCustomers = async () => {
+  // form state for Add Customer
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    balance: "",
+    isPayable: false,
+  });
+
+  const fetchData = async () => {
     try {
       const res = await fetch("http://localhost:3001/api/customers");
       const data = await res.json();
-      setCustomers(data);
-    } catch (err) {
-      console.error(err);
+      setCustomers(
+        data.map((c: any) => ({
+          ...c,
+          balance: parseFloat(c.balance) || 0,
+          status:
+            c.status === "payable" ? "payable" : "receivable",
+        }))
+      );
+    } catch (e) {
+      console.error("Failed to fetch customers:", e);
     }
   };
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
 
-  // --- fetch transactions for selected customer ---
   useEffect(() => {
-    if (!selected) {
-      setTransactions([]);
-      return;
+    fetchData();
+  }, [location.pathname]);
+
+  const handleAdd = async () => {
+    // basic validation
+    if (!form.name || !form.phone) {
+      return alert("Name and phone are required");
     }
-    setLoadingTx(true);
-    fetch(`http://localhost:3001/api/customers/${selected.id}/transactions`)
-      .then((r) => r.json())
-      .then((txs) => setTransactions(txs))
-      .catch(console.error)
-      .finally(() => setLoadingTx(false));
-  }, [selected]);
-
-  // --- add new customer handler ---
-  const handleAddCustomer = async (data: Omit<Customer, "id" | "createdAt">) => {
-    await fetch("http://localhost:3001/api/customers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    setShowCustModal(false);
-    fetchCustomers();
-  };
-
-  // --- delete customer handler ---
-  const handleDeleteCustomer = async (id: number) => {
-    if (!confirm("Delete this customer and all their data?")) return;
-    await fetch(`http://localhost:3001/api/customers/${id}`, {
-      method: "DELETE",
-    });
-    setSelected(null);
-    fetchCustomers();
-  };
-
-  // --- download PDF statement ---
-  const handleDownload = async () => {
-    if (!statementRef.current) return;
-    const canvas = await html2canvas(statementRef.current, { scale: 2 });
-    const img = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-    pdf.addImage(img, "PNG", 10, 10, 190, 0);
-    pdf.save(`${selected?.name}_statement.pdf`);
-  };
-
-  // --- open “Add Transaction” modal ---
-  const openTxModal = () => {
-    setTxType("got");
-    setTxAmount(0);
-    setTxDate(new Date().toISOString().slice(0, 10));
-    setShowTxModal(true);
-  };
-
-  // --- submit new transaction ---
-  const handleAddTransaction = async () => {
-    if (!selected) return;
-    await fetch(
-      `http://localhost:3001/api/customers/${selected.id}/transactions`,
-      {
+    const phoneExists = customers.some(
+      (c) => c.phone === form.phone
+    );
+    if (phoneExists) {
+      return alert("Phone already exists");
+    }
+    try {
+      const body = {
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        address: form.address,
+        balance: parseFloat(form.balance) || 0,
+        status: form.isPayable ? "payable" : "receivable",
+      };
+      const res = await fetch("http://localhost:3001/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: txType,
-          amount: txAmount,
-          // optional: pass date to server if you modify backend to accept it
-        }),
-      }
-    );
-    setShowTxModal(false);
-    // reload all
-    fetchCustomers();
-    // reload selected customer's transactions
-    setLoadingTx(true);
-    fetch(`http://localhost:3001/api/customers/${selected.id}/transactions`)
-      .then((r) => r.json())
-      .then((txs) => setTransactions(txs))
-      .catch(console.error)
-      .finally(() => setLoadingTx(false));
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      setShowModal(false);
+      setForm({
+        name: "",
+        phone: "",
+        email: "",
+        address: "",
+        balance: "",
+        isPayable: false,
+      });
+      await fetchData();
+    } catch (e) {
+      console.error("Add customer failed:", e);
+      alert("Failed to add customer");
+    }
   };
 
-  // --- calculate top‑level totals ---
-  const totalReceivable = customers
-    .filter((c) => c.status === "receivable")
-    .reduce((sum, c) => sum + Math.abs(parseFloat(c.balance)), 0);
-  const totalPayable = customers
-    .filter((c) => c.status === "payable")
-    .reduce((sum, c) => sum + parseFloat(c.balance), 0);
+    const handleDelete = async (id: number) => {
+    if (!window.confirm("Delete this customer?")) return;
 
-  const filtered = customers.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+    try {
+      const res = await fetch(
+        `http://localhost:3001/api/customers/${id}`,
+        { method: "DELETE" }
+      );
+
+      // grab whatever the server sent back (JSON or text)
+      const body = await res.text();
+
+      if (!res.ok) {
+        // show server’s error message (if any), or the status text
+        throw new Error(body || res.statusText);
+      }
+
+      // if OK, drop it out of our state
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+
+      // if that was the one showing in the detail pane, clear it
+      if (selected?.id === id) {
+        setSelected(null);
+      }
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Failed to delete customer:\n" + err.message);
+    }
+  };
+
+
+  const totalReceivable = customers.reduce(
+    (sum, c) => sum + (c.status === "receivable" ? c.balance : 0),
+    0
   );
+  const totalPayable = customers.reduce(
+    (sum, c) => sum + (c.status === "payable" ? c.balance : 0),
+    0
+  );
+
+  const list = customers
+    .filter(
+      (c) =>
+        (filter === "all" || c.status === filter) &&
+        c.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
   return (
     <div className="p-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h3 className="text-primary">Customers</h3>
-        <Button onClick={() => setShowCustModal(true)}>
-          <Plus className="me-2" /> Add Customer
+        <h3 className="fw-bold text-primary">Customers</h3>
+        <Button variant="primary" onClick={() => setShowModal(true)}>
+          <Plus className="me-2" size={18} />
+          Add Customer
         </Button>
       </div>
 
-      {/* stats */}
-      <Row className="mb-4 g-3">
+      <Row className="g-3 mb-4">
         {[
           {
             title: "Total Receivable",
@@ -178,7 +191,7 @@ export default function CustomersPage() {
           {
             title: "Total Payable",
             value: formatINR(totalPayable),
-            color: "danger",
+            color: "warning",
             icon: <Wallet />,
           },
           {
@@ -187,158 +200,152 @@ export default function CustomersPage() {
             color: "info",
             icon: <Users />,
           },
-        ].map((stat, i) => (
-          <Col key={i} md={4}>
-            <Card className={`border-start border-4 border-${stat.color}`}>
+        ].map((card, i) => (
+          <Col md={4} key={i}>
+            <Card
+              className={`border-start border-4 border-${card.color} shadow-sm`}
+            >
               <Card.Body className="d-flex justify-content-between align-items-center">
                 <div>
-                  <div className={`text-${stat.color} small fw-bold`}>
-                    {stat.title}
+                  <div
+                    className={`text-${card.color} text-uppercase small fw-bold mb-1`}
+                  >
+                    {card.title}
                   </div>
-                  <h5 className="fw-bold">{stat.value}</h5>
+                  <h5 className="fw-bold">{card.value}</h5>
                 </div>
-                <div className="bg-light p-2 rounded">{stat.icon}</div>
+                <div className="bg-light p-2 rounded">{card.icon}</div>
               </Card.Body>
             </Card>
           </Col>
         ))}
       </Row>
 
+      <div className="d-flex flex-wrap gap-3 align-items-center mb-4">
+        <InputGroup style={{ maxWidth: 300 }}>
+          <InputGroup.Text>
+            <Search size={16} />
+          </InputGroup.Text>
+          <Form.Control
+            placeholder="Search by name"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </InputGroup>
+        <Form.Select
+          style={{ maxWidth: 200 }}
+          value={filter}
+          onChange={(e) =>
+            setFilter(e.target.value as "all" | "receivable" | "payable")
+          }
+        >
+          <option value="all">All</option>
+          <option value="receivable">Receivable</option>
+          <option value="payable">Payable</option>
+        </Form.Select>
+      </div>
+
       <Row>
-        {/* left: customer list */}
-        <Col md={6}>
-          <InputGroup className="mb-3">
-            <InputGroup.Text>
-              <Search />
-            </InputGroup.Text>
-            <Form.Control
-              placeholder="Search customers..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </InputGroup>
+        <Col md={7}>
           <Card className="shadow-sm">
-            <Card.Body style={{ maxHeight: "60vh", overflowY: "auto" }}>
-              {filtered.map((c) => (
-                <div
-                  key={c.id}
-                  className={`d-flex justify-content-between align-items-center border p-3 mb-2 rounded ${
-                    selected?.id === c.id ? "bg-light border-primary" : ""
-                  }`}
-                  onClick={() => setSelected(c)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <div>
-                    <strong>{c.name}</strong>
-                    <br />
-                    <small className="text-muted">{c.phone}</small>
-                  </div>
-                  <Badge bg={c.status === "receivable" ? "success" : "danger"}>
-                    {c.status.toUpperCase()}
-                  </Badge>
+            <Card.Body
+              style={{ maxHeight: "60vh", overflowY: "auto" }}
+            >
+              {list.length === 0 ? (
+                <div className="text-muted text-center p-5">
+                  No customers found.
                 </div>
-              ))}
+              ) : (
+                list.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`d-flex justify-content-between align-items-center p-3 rounded mb-2 border ${
+                      selected?.id === c.id ? "bg-light border-primary" : ""
+                    }`}
+                    onClick={() => setSelected(c)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div>
+                      <strong>{c.name}</strong>
+                      <br />
+                      <small className="text-muted">{c.phone}</small>
+                    </div>
+                    <div className="text-end">
+                      <Badge
+                        bg={
+                          c.status === "receivable" ? "success" : "danger"
+                        }
+                        className="mb-1"
+                      >
+                        {c.status.toUpperCase()}
+                      </Badge>
+                      <br />
+                      <span className="fw-semibold">
+                        {formatINR(c.balance)}
+                      </span>
+                    </div>
+                    <ChevronRight
+                      size={18}
+                      className="ms-2 text-muted"
+                    />
+                  </div>
+                ))
+              )}
             </Card.Body>
           </Card>
         </Col>
 
-        {/* right: detail + transactions */}
-        <Col md={6}>
+        <Col md={5}>
           <Card className="shadow-sm h-100">
-            <Card.Body ref={statementRef} className="p-4">
+            <Card.Body>
               {selected ? (
                 <>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="text-primary mb-0">{selected.name}</h5>
-                    <div>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        className="me-2"
-                        onClick={openTxModal}
-                      >
-                        <Edit2 className="me-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline-danger"
-                        size="sm"
-                        className="me-2"
-                        onClick={() => handleDeleteCustomer(selected.id)}
-                      >
-                        <Trash2 className="me-1" />
-                        Delete
-                      </Button>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={handleDownload}
-                      >
-                        <Download className="me-1" />
-                        Report
-                      </Button>
-                    </div>
-                  </div>
-
+                  <h5 className="text-primary fw-bold mb-3">
+                    {selected.name}
+                  </h5>
                   <p>
                     <strong>Phone:</strong> {selected.phone}
                   </p>
-                  {selected.email && (
-                    <p>
-                      <strong>Email:</strong> {selected.email}
-                    </p>
-                  )}
+                  <p>
+                    <strong>Email:</strong> {selected.email}
+                  </p>
                   {selected.address && (
                     <p>
                       <strong>Address:</strong> {selected.address}
                     </p>
                   )}
-
-                  <hr />
-                  <h6>Transaction History</h6>
-                  {loadingTx ? (
-                    <Spinner animation="border" />
-                  ) : (
-                    <Table striped bordered hover size="sm" responsive>
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th className="text-danger text-end">You Gave</th>
-                          <th className="text-success text-end">You Got</th>
-                          <th>Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {transactions.map((tx) => {
-                          const gave = tx.type === "gave" ? tx.amount : 0;
-                          const got = tx.type === "got" ? tx.amount : 0;
-                          return (
-                            <tr key={tx.id}>
-                              <td>
-                                {new Date(tx.created_at).toLocaleDateString()}
-                              </td>
-                              <td className="text-danger text-end">
-                                {gave ? formatINR(gave) : "—"}
-                              </td>
-                              <td className="text-success text-end">
-                                {got ? formatINR(got) : "—"}
-                              </td>
-                              <td className="text-end">
-                                {/* if your backend calculates runningBalance */}
-                                {tx.runningBalance != null
-                                  ? formatINR(tx.runningBalance)
-                                  : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </Table>
-                  )}
+                  <p>
+                    <strong>Balance:</strong>{" "}
+                    {formatINR(selected.balance)}
+                  </p>
+                  <p>
+                    <strong>Status:</strong>{" "}
+                    <Badge
+                      bg={
+                        selected.status === "receivable"
+                          ? "success"
+                          : "danger"
+                      }
+                    >
+                      {selected.status.toUpperCase()}
+                    </Badge>
+                  </p>
+                  <p>
+                    <strong>Created:</strong>{" "}
+                    {new Date(
+                      selected.createdAt
+                    ).toLocaleDateString()}
+                  </p>
+                  <Button
+                    variant="outline-danger"
+                    onClick={() => handleDelete(selected.id)}
+                  >
+                    Delete
+                  </Button>
                 </>
               ) : (
-                <div className="text-muted text-center h-100 d-flex align-items-center justify-content-center">
-                  <p>Select a customer to view details.</p>
+                <div className="text-center text-muted">
+                  Select a customer to view details
                 </div>
               )}
             </Card.Body>
@@ -346,64 +353,104 @@ export default function CustomersPage() {
         </Col>
       </Row>
 
-      {/* Add Customer modal */}
-      <AddCustomerModal
-        show={showCustModal}
-        onClose={() => setShowCustModal(false)}
-        onSubmit={handleAddCustomer}
-      />
-
-      {/* Add/Edit Transaction modal */}
-      <Modal show={showTxModal} onHide={() => setShowTxModal(false)} centered>
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Add Transaction</Modal.Title>
+          <Modal.Title>Add Customer</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form.Group className="mb-2">
-            <Form.Label>Type</Form.Label>
-            <Form.Select
-              value={txType}
-              onChange={(e) =>
-                setTxType(e.target.value as "got" | "gave")
-              }
-            >
-              <option value="got">You Got</option>
-              <option value="gave">You Gave</option>
-            </Form.Select>
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Label>Amount</Form.Label>
-            <Form.Control
-              type="number"
-              value={txAmount}
-              onChange={(e) =>
-                setTxAmount(parseFloat(e.target.value))
+          <Form>
+            <Row className="g-2">
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Name</Form.Label>
+                  <Form.Control
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm({ ...form, name: e.target.value })
+                    }
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Phone</Form.Label>
+                  <Form.Control
+                    value={form.phone}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        phone: e.target.value.replace(/\D/g, ""),
+                      })
+                    }
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Email</Form.Label>
+                  <Form.Control
+                    type="email"
+                    value={form.email}
+                    onChange={(e) =>
+                      setForm({ ...form, email: e.target.value })
+                    }
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Address</Form.Label>
+                  <Form.Control
+                    value={form.address}
+                    onChange={(e) =>
+                      setForm({ ...form, address: e.target.value })
+                    }
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Balance</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={form.balance}
+                    onChange={(e) =>
+                      setForm({ ...form, balance: e.target.value })
+                    }
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Form.Check
+              className="mt-3"
+              inline
+              label="Receivable"
+              type="radio"
+              checked={!form.isPayable}
+              onChange={() =>
+                setForm({ ...form, isPayable: false })
               }
             />
-          </Form.Group>
-          <Form.Group>
-            <Form.Label>Date</Form.Label>
-            <Form.Control
-              type="date"
-              value={txDate}
-              onChange={(e) => setTxDate(e.target.value)}
+            <Form.Check
+              inline
+              label="Payable"
+              type="radio"
+              checked={form.isPayable}
+              onChange={() =>
+                setForm({ ...form, isPayable: true })
+              }
             />
-          </Form.Group>
+          </Form>
         </Modal.Body>
         <Modal.Footer>
           <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowTxModal(false)}
+            variant="outline-secondary"
+            onClick={() => setShowModal(false)}
           >
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleAddTransaction}
-          >
-            Submit
+          <Button variant="primary" onClick={handleAdd}>
+            Add
           </Button>
         </Modal.Footer>
       </Modal>
