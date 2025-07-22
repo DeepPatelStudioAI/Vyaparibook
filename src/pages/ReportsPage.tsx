@@ -29,6 +29,7 @@ export default function ReportsPage() {
   // Preselect customerId from URL (e.g. /dashboard/reports?customerId=2)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    const type = params.get('type'); // 'got' or 'gave'
     const cid = params.get('customerId');
     if (cid) setSelectedId(Number(cid));
   }, [location.search]);

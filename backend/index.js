@@ -172,6 +172,72 @@ app.post('/api/customers/:id/transactions', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────
+//  GET supplier transactions
+app.get('/api/suppliers/:id/transactions', async (req, res) => {
+  const supplierId = req.params.id;
+  try {
+    const [rows] = await db.query(
+      `SELECT id, type, amount, method, note, created_at
+         FROM supplier_transactions
+         WHERE supplierId = ?
+         ORDER BY created_at DESC`,
+      [supplierId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch supplier transactions: ' + err.message });
+  }
+});
+
+//  POST a new transaction for a supplier
+app.post('/api/suppliers/:id/transactions', async (req, res) => {
+  const supplierId = req.params.id;
+  const { type, amount, method = 'Manual', note = null } = req.body;
+  if (!type || typeof amount !== 'number') {
+    return res.status(400).json({ error: 'Type and numeric amount are required' });
+  }
+
+  try {
+    const [result] = await db.query(
+      `INSERT INTO supplier_transactions
+         (supplierId, type, amount, method, note, created_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [supplierId, type, amount, method, note]
+    );
+    // Return the newly created row
+    const [[newTx]] = await db.query(
+      `SELECT id, type, amount, method, note, created_at
+         FROM supplier_transactions
+         WHERE id = ?`,
+      [result.insertId]
+    );
+    res.status(201).json(newTx);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to add supplier transaction: ' + err.message });
+  }
+});
+
+//  DELETE a single supplier transaction
+app.delete('/api/transactions/supplier/:txId', async (req, res) => {
+  const txId = req.params.txId;
+  try {
+    const [result] = await db.query(
+      'DELETE FROM supplier_transactions WHERE id = ?',
+      [txId]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    res.sendStatus(204);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete supplier transaction: ' + err.message });
+  }
+});
+// ─────────────────────────────────────────────────────────
 
 
 // ✅ Add a supplier

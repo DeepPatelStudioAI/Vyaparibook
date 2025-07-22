@@ -1,4 +1,3 @@
-// src/pages/TransactionsPage.tsx
 import React, { useEffect, useState } from 'react'
 import {
   Card,
@@ -44,7 +43,6 @@ export default function TransactionsPage() {
 
   const navigate = useNavigate()
 
-  // load all transactions
   const loadTransactions = async () => {
     setLoading(true)
     setError(null)
@@ -72,13 +70,11 @@ export default function TransactionsPage() {
     }
   }
 
-  // open confirm delete modal
   const confirmDelete = (id: number) => {
     setDeletingId(id)
     setShowModal(true)
   }
 
-  // actually delete
   const handleDelete = async () => {
     if (deletingId === null) return
     try {
@@ -90,10 +86,8 @@ export default function TransactionsPage() {
         const err = await res.json()
         throw new Error(err.error || res.statusText)
       }
-      // close dialog
       setShowModal(false)
       setDeletingId(null)
-      // reload the list so it drops out immediately
       loadTransactions()
     } catch (err: any) {
       console.error('Delete failed:', err)
@@ -105,7 +99,6 @@ export default function TransactionsPage() {
     loadTransactions()
   }, [])
 
-  // apply filters
   const filtered = txs.filter((tx) => {
     const txt = tx.customerName.toLowerCase().includes(search.toLowerCase())
     const num = String(tx.invoiceNumber).includes(search)
@@ -120,6 +113,7 @@ export default function TransactionsPage() {
       </div>
     )
   }
+
   if (error) {
     return (
       <div className="p-4">
@@ -181,7 +175,7 @@ export default function TransactionsPage() {
                 <th>Invoice #</th>
                 <th>Type</th>
                 <th className="text-end">Amount</th>
-                <th className="text-center">Report</th>
+                <th className="text-center">Reports</th>
                 <th className="text-center">Delete</th>
               </tr>
             </thead>
@@ -211,13 +205,25 @@ export default function TransactionsPage() {
                       <Button
                         size="sm"
                         variant="outline-primary"
+                        className="me-1"
                         onClick={() =>
                           navigate(
-                            `/dashboard/reports?customerId=${tx.customerId}`
+                            `/dashboard/reports?customerId=${tx.customerId}&type=got`
                           )
                         }
                       >
-                        <FileText size={14} />
+                        Got
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline-danger"
+                        onClick={() =>
+                          navigate(
+                            `/dashboard/reports?customerId=${tx.customerId}&type=gave`
+                          )
+                        }
+                      >
+                        Gave
                       </Button>
                     </td>
                     <td className="text-center">

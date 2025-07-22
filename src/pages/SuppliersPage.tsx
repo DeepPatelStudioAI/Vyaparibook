@@ -3,7 +3,9 @@ import React, { useEffect, useState } from 'react';
 import {
   Plus, Search, ChevronRight, Truck, TrendingUp, Wallet
 } from 'lucide-react';
-import { Modal, Button, Form, Badge, InputGroup, Card, Row, Col } from 'react-bootstrap';
+import {
+  Modal, Button, Form, Badge, InputGroup, Card, Row, Col
+} from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
 
 interface Supplier {
@@ -16,10 +18,15 @@ interface Supplier {
   createdAt: string;
 }
 
+interface Transaction {
+  id: number;
+  type: 'gave' | 'got';
+  amount: number;
+  created_at: string;
+}
+
 const formatINR = (amount: number): string =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency', currency: 'INR'
-  }).format(amount);
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -28,78 +35,85 @@ export default function SuppliersPage() {
   const [selected, setSelected] = useState<Supplier | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', balance: '', isPayable: false });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transForm, setTransForm] = useState({ amount: '', type: 'gave' });
+  const [showTransModal, setShowTransModal] = useState(false);
   const location = useLocation();
 
   const fetchData = async () => {
-    try {
-      const res = await fetch('http://localhost:3001/api/suppliers');
-      const data = await res.json();
-      setSuppliers(data.map((s: any) => ({
-        ...s,
-        balance: parseFloat(s.balance) || 0,
-        status: s.status === 'payable' ? 'payable' : 'receivable',
-      })));
-    } catch (e) {
-      console.error('Failed to fetch suppliers:', e);
-    }
+    const res = await fetch('http://localhost:3001/api/suppliers');
+    const data = await res.json();
+    setSuppliers(data.map((s: any) => ({
+      ...s,
+      balance: parseFloat(s.balance) || 0,
+      status: s.status === 'payable' ? 'payable' : 'receivable',
+    })));
+  };
+
+  const fetchTransactions = async (supplierId: number) => {
+    const res = await fetch(`http://localhost:3001/api/suppliers/${supplierId}/transactions`);
+    const data = await res.json();
+    setTransactions(data);
   };
 
   useEffect(() => { fetchData(); }, [location.pathname]);
+  useEffect(() => {
+    if (selected) fetchTransactions(selected.id);
+  }, [selected]);
 
-  const handleAdd = async () => {
+  const handleAddSupplier = async () => {
     const phoneRegex = /^\d{10}$/;
 
-    if (!form.name.trim() || !form.phone.trim() || !form.email.trim()) {
-      return alert('Please fill in all required fields');
-    }
+    if (!form.name.trim() || !form.phone.trim() || !form.email.trim()) return alert('Fill all fields');
+    if (!phoneRegex.test(form.phone)) return alert('Phone must be 10 digits');
+    if (suppliers.some(s => s.phone === form.phone)) return alert('Phone already exists');
 
-    if (!phoneRegex.test(form.phone)) {
-      return alert('Phone number must be exactly 10 digits');
-    }
-
-    const phoneExists = suppliers.some(s => s.phone === form.phone);
-    if (phoneExists) {
-      return alert('Phone number already exists for another supplier');
-    }
-
-    const status = form.isPayable ? 'payable' : 'receivable';
     const body = {
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
       amount: parseFloat(form.balance) || 0,
-      status,
+      status: form.isPayable ? 'payable' : 'receivable',
     };
 
-    try {
-      const res = await fetch('http://localhost:3001/api/suppliers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+    await fetch('http://localhost:3001/api/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-      if (!res.ok) throw new Error();
-
-      setShowModal(false);
-      setForm({ name: '', phone: '', email: '', balance: '', isPayable: false });
-      await fetchData();
-    } catch (e) {
-      console.error('Add supplier failed:', e);
-      alert('Failed to add supplier');
-    }
+    setForm({ name: '', phone: '', email: '', balance: '', isPayable: false });
+    setShowModal(false);
+    fetchData();
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Delete this supplier?')) return;
     await fetch(`http://localhost:3001/api/suppliers/${id}`, { method: 'DELETE' });
-    await fetchData();
+    fetchData();
     setSelected(null);
+  };
+
+  const handleAddTransaction = async () => {
+    const amount = parseFloat(transForm.amount);
+    if (!amount || amount <= 0) return alert('Enter a valid amount');
+
+    await fetch(`http://localhost:3001/api/suppliers/${selected?.id}/transactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, type: transForm.type }),
+    });
+
+    setTransForm({ amount: '', type: 'gave' });
+    setShowTransModal(false);
+    fetchData();
+    if (selected) fetchTransactions(selected.id);
   };
 
   const totalReceivable = suppliers.reduce((sum, s) => sum + (s.status === 'receivable' ? s.balance : 0), 0);
   const totalPayable = suppliers.reduce((sum, s) => sum + (s.status === 'payable' ? s.balance : 0), 0);
 
-  const list = suppliers
+  const filteredSuppliers = suppliers
     .filter(s => filter === 'all' || s.status === filter)
     .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -146,11 +160,7 @@ export default function SuppliersPage() {
             onChange={e => setSearchTerm(e.target.value)}
           />
         </InputGroup>
-        <Form.Select
-          style={{ maxWidth: 200 }}
-          value={filter}
-          onChange={e => setFilter(e.target.value as any)}
-        >
+        <Form.Select style={{ maxWidth: 200 }} value={filter} onChange={e => setFilter(e.target.value as any)}>
           <option value="all">All</option>
           <option value="receivable">Receivable</option>
           <option value="payable">Payable</option>
@@ -161,10 +171,10 @@ export default function SuppliersPage() {
         <Col md={7}>
           <Card className="shadow-sm">
             <Card.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              {list.length === 0 ? (
+              {filteredSuppliers.length === 0 ? (
                 <div className="text-muted text-center p-5">No suppliers found.</div>
               ) : (
-                list.map(s => (
+                filteredSuppliers.map(s => (
                   <div
                     key={s.id}
                     className={`d-flex justify-content-between align-items-center p-3 rounded mb-2 border ${selected?.id === s.id ? 'bg-light border-primary' : ''}`}
@@ -186,6 +196,7 @@ export default function SuppliersPage() {
             </Card.Body>
           </Card>
         </Col>
+
         <Col md={5}>
           <Card className="shadow-sm h-100">
             <Card.Body>
@@ -197,7 +208,23 @@ export default function SuppliersPage() {
                   <p><strong>Balance:</strong> {formatINR(selected.balance)}</p>
                   <p><strong>Status:</strong> <Badge bg={selected.status === 'receivable' ? 'success' : 'danger'}>{selected.status.toUpperCase()}</Badge></p>
                   <p><strong>Created:</strong> {new Date(selected.createdAt).toLocaleDateString()}</p>
+                  <Button variant="outline-primary" className="me-2" onClick={() => setShowTransModal(true)}>Add Transaction</Button>
                   <Button variant="outline-danger" onClick={() => handleDelete(selected.id)}>Delete</Button>
+
+                  <hr />
+                  <h6 className="fw-bold">Transactions</h6>
+                  {transactions.length === 0 ? (
+                    <p className="text-muted">No transactions found.</p>
+                  ) : (
+                    <ul className="list-unstyled mt-2">
+                      {transactions.map(tx => (
+                        <li key={tx.id} className="mb-2 d-flex justify-content-between">
+                          <span>{tx.type === 'gave' ? 'You gave' : 'You got'} - {formatINR(tx.amount)}</span>
+                          <small className="text-muted">{new Date(tx.created_at).toLocaleDateString()}</small>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </>
               ) : (
                 <div className="text-center text-muted">Select a supplier to view details</div>
@@ -207,10 +234,9 @@ export default function SuppliersPage() {
         </Col>
       </Row>
 
+      {/* Add Supplier Modal */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Add Supplier</Modal.Title>
-        </Modal.Header>
+        <Modal.Header closeButton><Modal.Title>Add Supplier</Modal.Title></Modal.Header>
         <Modal.Body>
           <Form>
             <Row className="g-2">
@@ -246,7 +272,30 @@ export default function SuppliersPage() {
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-          <Button variant="primary" onClick={handleAdd}>Add</Button>
+          <Button variant="primary" onClick={handleAddSupplier}>Add</Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Add Transaction Modal */}
+      <Modal show={showTransModal} onHide={() => setShowTransModal(false)} centered>
+        <Modal.Header closeButton><Modal.Title>Add Transaction</Modal.Title></Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3"><Form.Label>Amount</Form.Label>
+              <Form.Control type="text" value={transForm.amount} onChange={e => {
+                const v = e.target.value;
+                if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                  setTransForm(prev => ({ ...prev, amount: v }));
+                }
+              }} />
+            </Form.Group>
+            <Form.Check inline label="You Gave" type="radio" checked={transForm.type === 'gave'} onChange={() => setTransForm({ ...transForm, type: 'gave' })} />
+            <Form.Check inline label="You Got" type="radio" checked={transForm.type === 'got'} onChange={() => setTransForm({ ...transForm, type: 'got' })} />
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => setShowTransModal(false)}>Cancel</Button>
+          <Button variant="primary" onClick={handleAddTransaction}>Add</Button>
         </Modal.Footer>
       </Modal>
     </div>
