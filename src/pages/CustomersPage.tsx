@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Wallet,
   Download,
+  Trash2,
 } from "lucide-react";
 import {
   Modal,
@@ -67,7 +68,6 @@ export default function CustomersPage() {
     isPayable: false,
   });
 
-  // Add Transaction form
   const [showTxModal, setShowTxModal] = useState(false);
   const [txType, setTxType] = useState<"got" | "gave">("got");
   const [txAmount, setTxAmount] = useState<number>(0);
@@ -76,86 +76,62 @@ export default function CustomersPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Fetch customers
+  // --- Fetch all customers ---
   const fetchCustomers = async () => {
-    try {
-      const res = await fetch("http://localhost:3001/api/customers");
-      const data = await res.json();
-      setCustomers(
-        data.map((c: any) => ({
-          ...c,
-          balance: parseFloat(c.balance),
-          status: c.status === "payable" ? "payable" : "receivable",
-        }))
-      );
-    } catch (e) {
-      console.error(e);
-    }
+    const res = await fetch("http://localhost:3001/api/customers");
+    const data = await res.json();
+    setCustomers(
+      data.map((c: any) => ({
+        ...c,
+        balance: parseFloat(c.balance),
+        status: c.status === "payable" ? "payable" : "receivable",
+      }))
+    );
   };
 
-  // Fetch transactions for selected customer
-  const fetchTransactions = async (custId: number) => {
-    setLoadingTx(true);
-    try {
-      const res = await fetch(
-        `http://localhost:3001/api/customers/${custId}/transactions`
-      );
-      const data = await res.json();
-      setTransactions(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingTx(false);
-    }
-  };
+  // --- Fetch transactions for one customer ---
+  async function fetchTransactions(custId: number) {
+  setLoadingTx(true);
+  const r = await fetch(`http://localhost:3001/api/customers/${custId}/transactions`);
+  const data = await r.json();
+  setTransactions(data);
+  setLoadingTx(false);
+}
 
-  // On mount or when URL changes
   useEffect(() => {
     fetchCustomers();
   }, [location.pathname]);
 
-  // When you pick a customer, load their txns
   useEffect(() => {
     if (selected) fetchTransactions(selected.id);
     else setTransactions([]);
   }, [selected]);
 
-  // Add customer
+  // --- Add Customer ---
   const handleAddCustomer = async () => {
     if (!custForm.name || custForm.phone.length !== 10) {
-      return alert("Name required & phone must be 10 digits");
+      return alert("Name & 10‑digit phone required");
     }
-    try {
-      const res = await fetch("http://localhost:3001/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: custForm.name,
-          phone: custForm.phone,
-          email: custForm.email,
-          address: custForm.address,
-          balance: parseFloat(custForm.balance) || 0,
-          status: custForm.isPayable ? "payable" : "receivable",
-        }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || payload.message);
-      setShowCustModal(false);
-      setCustForm({
-        name: "",
-        phone: "",
-        email: "",
-        address: "",
-        balance: "",
-        isPayable: false,
-      });
-      await fetchCustomers();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    const res = await fetch("http://localhost:3001/api/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: custForm.name,
+        phone: custForm.phone,
+        email: custForm.email,
+        address: custForm.address,
+        balance: parseFloat(custForm.balance) || 0,
+        status: custForm.isPayable ? "payable" : "receivable",
+      }),
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload.error || payload.message);
+    setShowCustModal(false);
+    setCustForm({ name: "", phone: "", email: "", address: "", balance: "", isPayable: false });
+    await fetchCustomers();
   };
 
-  // Delete customer
+  // --- Delete Customer ---
   const handleDeleteCustomer = async (id: number) => {
     if (!window.confirm("Delete this customer?")) return;
     const res = await fetch(`http://localhost:3001/api/customers/${id}`, {
@@ -169,7 +145,7 @@ export default function CustomersPage() {
     setCustomers((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // Open TX modal
+  // --- Open & Submit Transaction ---
   const openTxModal = () => {
     if (!selected) return;
     setTxType("got");
@@ -178,7 +154,6 @@ export default function CustomersPage() {
     setShowTxModal(true);
   };
 
-  // Submit TX
   const handleAddTransaction = async () => {
     if (!selected) return;
     const res = await fetch(
@@ -186,24 +161,49 @@ export default function CustomersPage() {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: txType,
-          amount: txAmount,
-          date: txDate,
-        }),
+        body: JSON.stringify({ type: txType, amount: txAmount, date: txDate }),
       }
     );
-    if (!res.ok) {
-      const err = await res.json();
-      return alert(err.error || err.message || "Failed to add txn");
-    }
+    const payload = await res.json();
+    if (!res.ok) return alert(payload.error || payload.message || "Failed");
     setShowTxModal(false);
-    // reload both lists
     await fetchCustomers();
     await fetchTransactions(selected.id);
   };
 
-  // Top‑level stats
+  // --- Delete a single transaction ---
+  const handleDeleteTransaction = async (txId: number) => {
+  if (!window.confirm('Delete this transaction?')) return;
+
+  try {
+    const res = await fetch(
+      `http://localhost:3001/api/transactions/${txId}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || res.statusText);
+    }
+
+    // 1) remove from the selected.transactions list
+    setSelected((cust) => {
+      if (!cust) return cust;
+      return {
+        ...cust,
+        transactions: (cust.transactions || []).filter((t) => t.id !== txId)
+      };
+    });
+
+    // 2) also refetch the summary list so balances update immediately
+    fetchData();
+  } catch (err: any) {
+    console.error('Failed to delete transaction:', err);
+    alert('Failed to delete transaction:\n' + err.message);
+  }
+};
+
+
+  // --- Top‑level stats ---
   const totalReceivable = customers
     .filter((c) => c.status === "receivable")
     .reduce((s, c) => s + Math.abs(c.balance), 0);
@@ -211,7 +211,7 @@ export default function CustomersPage() {
     .filter((c) => c.status === "payable")
     .reduce((s, c) => s + Math.abs(c.balance), 0);
 
-  // Filter/search
+  // --- Filter & search customers ---
   const filtered = customers.filter(
     (c) =>
       (filter === "all" || c.status === filter) &&
@@ -220,7 +220,7 @@ export default function CustomersPage() {
 
   return (
     <div className="p-4">
-      {/* header */}
+      {/* Header */}
       <div className="d-flex justify-content-between mb-4">
         <h3 className="text-primary">Customers</h3>
         <Button onClick={() => setShowCustModal(true)}>
@@ -228,35 +228,18 @@ export default function CustomersPage() {
         </Button>
       </div>
 
-      {/* stats */}
+      {/* Stats */}
       <Row className="mb-4 g-3">
         {[
-          {
-            title: "Total Receivable",
-            value: formatINR(totalReceivable),
-            color: "success",
-            icon: <TrendingUp />,
-          },
-          {
-            title: "Total Payable",
-            value: formatINR(totalPayable),
-            color: "danger",
-            icon: <Wallet />,
-          },
-          {
-            title: "Total Customers",
-            value: customers.length,
-            color: "info",
-            icon: <Users />,
-          },
+          { title: "Total Receivable", value: formatINR(totalReceivable), color: "success", icon: <TrendingUp /> },
+          { title: "Total Payable", value: formatINR(totalPayable), color: "danger", icon: <Wallet /> },
+          { title: "Total Customers", value: customers.length, color: "info", icon: <Users /> },
         ].map((st, i) => (
           <Col md={4} key={i}>
             <Card className={`border-start border-4 border-${st.color}`}>
               <Card.Body className="d-flex justify-content-between">
                 <div>
-                  <div className={`text-${st.color} small fw-bold`}>
-                    {st.title}
-                  </div>
+                  <div className={`text-${st.color} small fw-bold`}>{st.title}</div>
                   <h5 className="fw-bold">{st.value}</h5>
                 </div>
                 <div className="bg-light p-2 rounded">{st.icon}</div>
@@ -267,23 +250,19 @@ export default function CustomersPage() {
       </Row>
 
       <Row>
-        {/* left: list */}
+        {/* Customer List */}
         <Col md={6}>
           <InputGroup className="mb-3">
-            <InputGroup.Text>
-              <Search />
-            </InputGroup.Text>
+            <InputGroup.Text><Search /></InputGroup.Text>
             <Form.Control
-              placeholder="Search customers..."
+              placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             <Form.Select
               style={{ maxWidth: 150 }}
               value={filter}
-              onChange={(e) =>
-                setFilter(e.target.value as "all" | "receivable" | "payable")
-              }
+              onChange={(e) => setFilter(e.target.value as any)}
             >
               <option value="all">All</option>
               <option value="receivable">Receivable</option>
@@ -315,51 +294,35 @@ export default function CustomersPage() {
           </Card>
         </Col>
 
-        {/* right: detail + tx */}
+        {/* Detail & Transactions */}
         <Col md={6}>
           <Card className="h-100">
             <Card.Body>
               {selected ? (
                 <>
-                  {/* header */}
+                  {/* Customer Info + Actions */}
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <h5 className="text-primary mb-0">{selected.name}</h5>
                     <div className="d-flex gap-2">
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={openTxModal}
-                      >
+                      <Button size="sm" variant="outline-secondary" onClick={openTxModal}>
                         + Transaction
                       </Button>
                       <Button
-                        variant="outline-danger"
                         size="sm"
+                        variant="outline-danger"
                         onClick={() => handleDeleteCustomer(selected.id)}
                       >
                         Delete
                       </Button>
                     </div>
                   </div>
-
-                  {/* info */}
-                  <p>
-                    <strong>Phone:</strong> {selected.phone}
-                  </p>
-                  {selected.email && (
-                    <p>
-                      <strong>Email:</strong> {selected.email}
-                    </p>
-                  )}
-                  {selected.address && (
-                    <p>
-                      <strong>Address:</strong> {selected.address}
-                    </p>
-                  )}
+                  <p><strong>Phone:</strong> {selected.phone}</p>
+                  {selected.email && <p><strong>Email:</strong> {selected.email}</p>}
+                  {selected.address && <p><strong>Address:</strong> {selected.address}</p>}
                   <hr />
 
-                  {/* transactions table */}
-                  <h6>Transaction History</h6>
+                  {/* Transactions Table */}
+                  <h6>History</h6>
                   {loadingTx ? (
                     <Spinner />
                   ) : (
@@ -371,6 +334,7 @@ export default function CustomersPage() {
                           <th className="text-success text-end">You Got</th>
                           <th className="text-end">Balance</th>
                           <th className="text-center">Report</th>
+                          <th className="text-center">Delete</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -379,31 +343,30 @@ export default function CustomersPage() {
                           const got = tx.type === "got" ? tx.amount : 0;
                           return (
                             <tr key={tx.id}>
-                              <td>
-                                {new Date(tx.created_at).toLocaleDateString()}
-                              </td>
-                              <td className="text-danger text-end">
-                                {gave ? formatINR(gave) : "—"}
-                              </td>
-                              <td className="text-success text-end">
-                                {got ? formatINR(got) : "—"}
-                              </td>
+                              <td>{new Date(tx.created_at).toLocaleDateString()}</td>
+                              <td className="text-danger text-end">{gave ? formatINR(gave) : "—"}</td>
+                              <td className="text-success text-end">{got ? formatINR(got) : "—"}</td>
                               <td className="text-end">
-                                {tx.runningBalance != null
-                                  ? formatINR(tx.runningBalance)
-                                  : "—"}
+                                {tx.runningBalance != null ? formatINR(tx.runningBalance) : "—"}
                               </td>
                               <td className="text-center">
                                 <Button
                                   size="sm"
                                   variant="outline-primary"
                                   onClick={() =>
-                                    navigate(
-                                      `/dashboard/reports?customerId=${selected.id}`
-                                    )
+                                    navigate(`/dashboard/reports?customerId=${selected.id}`)
                                   }
                                 >
                                   <Download size={14} />
+                                </Button>
+                              </td>
+                              <td className="text-center">
+                                <Button
+                                  size="sm"
+                                  variant="outline-danger"
+                                  onClick={() => handleDeleteTransaction(tx.id)}
+                                >
+                                  <Trash2 size={14} />
                                 </Button>
                               </td>
                             </tr>
@@ -415,7 +378,7 @@ export default function CustomersPage() {
                 </>
               ) : (
                 <div className="text-center text-muted mt-5">
-                  Select a customer
+                  Select a customer to view details
                 </div>
               )}
             </Card.Body>
@@ -424,7 +387,7 @@ export default function CustomersPage() {
       </Row>
 
       {/* Add Customer Modal */}
-      <Modal show={showCustModal} onHide={() => setShowCustModal(false)}>
+      <Modal show={showCustModal} onHide={() => setShowCustModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Add Customer</Modal.Title>
         </Modal.Header>
@@ -449,9 +412,9 @@ export default function CustomersPage() {
                     maxLength={10}
                     value={custForm.phone}
                     onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, "");
-                      if (digits.length <= 10)
-                        setCustForm({ ...custForm, phone: digits });
+                      const d = e.target.value.replace(/\D/g, "");
+                      if (d.length <= 10)
+                        setCustForm({ ...custForm, phone: d });
                     }}
                   />
                 </Form.Group>
@@ -494,29 +457,22 @@ export default function CustomersPage() {
             </Row>
             <Form.Check
               inline
-              label="Receivable"
               type="radio"
+              label="Receivable"
               checked={!custForm.isPayable}
-              onChange={() =>
-                setCustForm({ ...custForm, isPayable: false })
-              }
+              onChange={() => setCustForm({ ...custForm, isPayable: false })}
             />
             <Form.Check
               inline
-              label="Payable"
               type="radio"
+              label="Payable"
               checked={custForm.isPayable}
-              onChange={() =>
-                setCustForm({ ...custForm, isPayable: true })
-              }
+              onChange={() => setCustForm({ ...custForm, isPayable: true })}
             />
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button
-            variant="outline-secondary"
-            onClick={() => setShowCustModal(false)}
-          >
+          <Button variant="outline-secondary" onClick={() => setShowCustModal(false)}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleAddCustomer}>
@@ -526,9 +482,9 @@ export default function CustomersPage() {
       </Modal>
 
       {/* Add Transaction Modal */}
-      <Modal show={showTxModal} onHide={() => setShowTxModal(false)}>
+      <Modal show={showTxModal} onHide={() => setShowTxModal(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Add Transaction</Modal.Title>
+          <Modal.Title>Add Transaction for {selected?.name}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
@@ -561,11 +517,7 @@ export default function CustomersPage() {
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button
-            variant="outline-secondary"
-            size="sm"
-            onClick={() => setShowTxModal(false)}
-          >
+          <Button variant="outline-secondary" size="sm" onClick={() => setShowTxModal(false)}>
             Cancel
           </Button>
           <Button variant="primary" size="sm" onClick={handleAddTransaction}>

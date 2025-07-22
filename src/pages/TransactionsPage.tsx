@@ -1,5 +1,5 @@
 // src/pages/TransactionsPage.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'
 import {
   Card,
   Table,
@@ -11,48 +11,49 @@ import {
   Row,
   Col,
   Modal,
-} from 'react-bootstrap';
-import { Trash2, Search, RefreshCw, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+} from 'react-bootstrap'
+import { Trash2, Search, RefreshCw, FileText } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 interface TransactionRaw {
-  id: number;
-  invoiceNumber: number | null;
-  customerId: number;
-  customerName: string | null;
-  type: 'got' | 'gave';
-  amount: string | number;
+  id: number
+  invoiceNumber: number | null
+  customerId: number
+  customerName: string | null
+  type: 'got' | 'gave'
+  amount: string | number
 }
 
 interface Transaction {
-  id: number;
-  invoiceNumber: number | null;
-  customerId: number;
-  customerName: string;
-  type: 'got' | 'gave';
-  amount: number;
+  id: number
+  invoiceNumber: number | null
+  customerId: number
+  customerName: string
+  type: 'got' | 'gave'
+  amount: number
 }
 
 export default function TransactionsPage() {
-  const [txs, setTxs] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'got' | 'gave'>('all');
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [txs, setTxs] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'got' | 'gave'>('all')
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [showModal, setShowModal] = useState(false)
 
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
+  // load all transactions
   const loadTransactions = async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
-      const res = await fetch('http://localhost:3001/api/transactions');
-      if (!res.ok) throw new Error(`Server responded ${res.status}`);
-      const { data }: { data: TransactionRaw[] } = await res.json();
+      const res = await fetch('http://localhost:3001/api/transactions')
+      if (!res.ok) throw new Error(`Server ${res.status}`)
+      const { data }: { data: TransactionRaw[] } = await res.json()
       setTxs(
-        data.map(tx => ({
+        data.map((tx) => ({
           id: tx.id,
           invoiceNumber: tx.invoiceNumber,
           customerId: tx.customerId,
@@ -63,62 +64,68 @@ export default function TransactionsPage() {
               ? tx.amount
               : parseFloat(tx.amount as string) || 0,
         }))
-      );
+      )
     } catch (err: any) {
-      setError(err.message || 'Unexpected error');
+      setError(err.message || 'Unexpected error')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
+  // open confirm delete modal
   const confirmDelete = (id: number) => {
-    setDeletingId(id);
-    setShowModal(true);
-  };
+    setDeletingId(id)
+    setShowModal(true)
+  }
 
+  // actually delete
   const handleDelete = async () => {
-    if (deletingId === null) return;
+    if (deletingId === null) return
     try {
       const res = await fetch(
         `http://localhost:3001/api/transactions/${deletingId}`,
         { method: 'DELETE' }
-      );
-      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
-      setShowModal(false);
-      setDeletingId(null);
-      loadTransactions();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to delete transaction.');
+      )
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || res.statusText)
+      }
+      // close dialog
+      setShowModal(false)
+      setDeletingId(null)
+      // reload the list so it drops out immediately
+      loadTransactions()
+    } catch (err: any) {
+      console.error('Delete failed:', err)
+      alert('Failed to delete transaction:\n' + err.message)
     }
-  };
+  }
 
   useEffect(() => {
-    loadTransactions();
-  }, []);
+    loadTransactions()
+  }, [])
 
-  const filtered = txs.filter(tx => {
-    const textMatch =
-      tx.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      String(tx.invoiceNumber).includes(search);
-    const typeMatch = typeFilter === 'all' || tx.type === typeFilter;
-    return textMatch && typeMatch;
-  });
+  // apply filters
+  const filtered = txs.filter((tx) => {
+    const txt = tx.customerName.toLowerCase().includes(search.toLowerCase())
+    const num = String(tx.invoiceNumber).includes(search)
+    const typeOk = typeFilter === 'all' || tx.type === typeFilter
+    return (txt || num) && typeOk
+  })
 
   if (loading) {
     return (
       <div className="vh-50 d-flex justify-content-center align-items-center">
         <Spinner animation="border" />
       </div>
-    );
+    )
   }
-
   if (error) {
     return (
       <div className="p-4">
         <Alert variant="danger">Error: {error}</Alert>
       </div>
-    );
+    )
   }
 
   return (
@@ -139,6 +146,7 @@ export default function TransactionsPage() {
               >
                 <RefreshCw size={16} /> Refresh
               </Button>
+
               <InputGroup size="sm" className="me-2" style={{ width: 220 }}>
                 <InputGroup.Text>
                   <Search size={14} />
@@ -146,13 +154,14 @@ export default function TransactionsPage() {
                 <Form.Control
                   placeholder="Search customer or invoice"
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={(e) => setSearch(e.target.value)}
                 />
               </InputGroup>
+
               <Form.Select
                 size="sm"
                 value={typeFilter}
-                onChange={e =>
+                onChange={(e) =>
                   setTypeFilter(e.target.value as 'all' | 'got' | 'gave')
                 }
               >
@@ -184,7 +193,7 @@ export default function TransactionsPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map(tx => (
+                filtered.map((tx) => (
                   <tr key={tx.id}>
                     <td>{tx.customerName}</td>
                     <td>{tx.invoiceNumber ?? '—'}</td>
@@ -203,7 +212,9 @@ export default function TransactionsPage() {
                         size="sm"
                         variant="outline-primary"
                         onClick={() =>
-                          navigate(`/dashboard/reports?customerId=${tx.customerId}`)
+                          navigate(
+                            `/dashboard/reports?customerId=${tx.customerId}`
+                          )
                         }
                       >
                         <FileText size={14} />
@@ -226,7 +237,7 @@ export default function TransactionsPage() {
         </Card.Body>
       </Card>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirm */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Confirm Delete</Modal.Title>
@@ -249,5 +260,5 @@ export default function TransactionsPage() {
         </Modal.Footer>
       </Modal>
     </div>
-  );
+  )
 }

@@ -18,6 +18,7 @@ const db = mysql.createPool({
 }).promise();
 
 // Recalculate a customer’s balance based on transactions
+//const recalculateCustomerBalance = async (customerId) => 
 async function recalcBalance(customerId) {
   const [rows] = await db.query(
     `SELECT t.type, t.amount
@@ -118,22 +119,32 @@ app.delete('/api/customers/:id', async (req, res) => {
 });
 
 // GET all transactions for one customer
+// GET /api/customers/:id/transactions
 app.get('/api/customers/:id/transactions', async (req, res) => {
+  const { id } = req.params;
   try {
-    const [rows] = await db.query(
+    const [transactions] = await db.query(
       `SELECT
-         t.id, t.created_at, t.type, t.amount
+         t.id,
+         t.created_at,
+         t.type,
+         i.id   AS invoiceId,
+         t.amount
        FROM transactions t
-       JOIN invoices i ON t.invoice_id = i.id
+       JOIN invoices i
+         ON t.invoice_id = i.id
        WHERE i.customerId = ?
-       ORDER BY t.created_at ASC`,
-      [req.params.id]
+       ORDER BY t.created_at DESC`,
+      [id]
     );
-    res.json(rows);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.json(transactions);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: 'Failed to fetch transactions: ' + err.message });
   }
 });
+
 
 // POST a manual transaction for a customer
 app.post('/api/customers/:id/transactions', async (req, res) => {
@@ -258,47 +269,75 @@ app.get('/api/transactions', async (req, res) => {
          t.id,
          t.created_at AS date,
          t.type,
-         c.name as customerName,
-         c.id as customerId,
-         i.invoiceNumber,
+         c.name AS customerName,
+         c.id   AS customerId,
+         i.id   AS invoiceNumber,
          t.amount,
          t.method,
          t.note
        FROM transactions t
-       LEFT JOIN invoices i ON i.invoiceNumber = t.invoice_id
+       LEFT JOIN invoices i ON t.invoice_id = i.id
        LEFT JOIN customers c ON i.customerId = c.id
        ORDER BY t.created_at DESC`
     );
     res.json({ data: rows });
   } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/customers/:id/transactions', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [transactions] = await db.query(
+      `SELECT
+         t.id,
+         t.created_at AS created_at,
+         t.type,
+         i.id         AS invoiceId,
+         t.amount
+       FROM transactions t
+       JOIN invoices i ON t.invoice_id = i.id
+       WHERE i.customerId = ?
+       ORDER BY t.created_at DESC`,
+      [id]
+    );
+    res.json(transactions);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ✅ Delete a transaction and update balance
+// DELETE /api/transactions/:id
 app.delete('/api/transactions/:id', async (req, res) => {
+  const { id } = req.params;
   try {
-    const transactionId = req.params.id;
-
-    // Get customerId before deleting
+    // Find customerId so we can recalc
     const [[tx]] = await db.query(
       `SELECT i.customerId
        FROM transactions t
-       JOIN invoices i ON t.invoice_id = i.invoiceNumber
+       JOIN invoices i ON t.invoice_id = i.id
        WHERE t.id = ?`,
-      [transactionId]
+      [id]
     );
+    if (!tx) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
 
-    if (!tx) return res.status(404).json({ error: "Transaction not found" });
-
-    await db.query('DELETE FROM transactions WHERE id = ?', [transactionId]);
-    await recalculateCustomerBalance(tx.customerId);
+    await db.query('DELETE FROM transactions WHERE id = ?', [id]);
+    await recalculateCustomerBalance(tx.customerId);  // your helper above
 
     res.sendStatus(204);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
+
+
 
 // ✅ Start server
 app.listen(PORT, async () => {
