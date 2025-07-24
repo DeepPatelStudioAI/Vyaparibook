@@ -36,10 +36,7 @@ export default function SuppliersPage() {
   const [filter, setFilter] = useState<'all' | 'receivable' | 'payable'>('all');
   const [selected, setSelected] = useState<Supplier | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', balance: '', isPayable: false });
-  const [supplierProducts, setSupplierProducts] = useState([]);
-  const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity: '' });
-  const [showNewProduct, setShowNewProduct] = useState(false);
+  const [form, setForm] = useState({ name: '', phone: '', email: '' });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transForm, setTransForm] = useState({ amount: '', type: 'gave' });
   const [showTransModal, setShowTransModal] = useState(false);
@@ -94,8 +91,8 @@ export default function SuppliersPage() {
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
-      amount: parseFloat(form.balance) || 0,
-      status: form.isPayable ? 'payable' : 'receivable',
+      amount: 0,
+      status: 'active',
     };
 
     await fetch('http://localhost:3001/api/suppliers', {
@@ -104,7 +101,7 @@ export default function SuppliersPage() {
       body: JSON.stringify(body),
     });
 
-    setForm({ name: '', phone: '', email: '', balance: '', isPayable: false });
+    setForm({ name: '', phone: '', email: '' });
     setShowModal(false);
     fetchData();
   };
@@ -414,7 +411,7 @@ export default function SuppliersPage() {
       </Row>
 
       {/* Add Supplier Modal */}
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton><Modal.Title>Add Supplier</Modal.Title></Modal.Header>
         <Modal.Body>
           <Form>
@@ -429,121 +426,16 @@ export default function SuppliersPage() {
                   <Form.Control maxLength={10} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })} />
                 </Form.Group>
               </Col>
-              <Col md={6}>
+              <Col md={12}>
                 <Form.Group><Form.Label>Email</Form.Label>
                   <Form.Control type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                 </Form.Group>
               </Col>
-              <Col md={6}>
-                <Form.Group><Form.Label>Balance</Form.Label>
-                  <Form.Control type="text" value={form.balance} onChange={e => {
-                    const v = e.target.value;
-                    if (v === '' || /^\d*\.?\d*$/.test(v)) {
-                      setForm(prev => ({ ...prev, balance: v }));
-                    }
-                  }} />
-                </Form.Group>
-              </Col>
             </Row>
-            <Form.Check className="mt-3" inline label="Receivable" type="radio" checked={!form.isPayable} onChange={() => setForm({ ...form, isPayable: false })} />
-            <Form.Check inline label="Payable" type="radio" checked={form.isPayable} onChange={() => setForm({ ...form, isPayable: true })} />
-            
-            <hr />
-            <h6>Add Products</h6>
-            <Row className="g-2 mb-2">
-              <Col md={6}>
-                <Form.Select onChange={(e) => {
-                  if (e.target.value === 'new') {
-                    setShowNewProduct(true);
-                  } else if (e.target.value) {
-                    const product = products.find(p => p.id === e.target.value);
-                    if (product) {
-                      setSupplierProducts([...supplierProducts, { ...product, quantity: 1 }]);
-                    }
-                  }
-                  e.target.value = '';
-                }}>
-                  <option value="">Select Product</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                  <option value="new">+ Add New Product</option>
-                </Form.Select>
-              </Col>
-            </Row>
-            
-            {showNewProduct && (
-              <Card className="mb-3">
-                <Card.Body>
-                  <h6>New Product</h6>
-                  <Row className="g-2">
-                    <Col md={4}>
-                      <Form.Control placeholder="Product Name" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} />
-                    </Col>
-                    <Col md={3}>
-                      <Form.Control type="number" placeholder="Cost Price" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} />
-                    </Col>
-                    <Col md={3}>
-                      <Form.Control type="number" placeholder="Quantity" value={newProduct.quantity} onChange={(e) => setNewProduct({...newProduct, quantity: e.target.value})} />
-                    </Col>
-                    <Col md={2}>
-                      <Button size="sm" onClick={() => {
-                        if (newProduct.name && newProduct.price && newProduct.quantity) {
-                          const product = {
-                            id: Date.now().toString(),
-                            name: newProduct.name,
-                            basePrice: parseFloat(newProduct.price) * 1.2,
-                            costPrice: parseFloat(newProduct.price),
-                            stockQuantity: parseInt(newProduct.quantity),
-                            category: 'purchased',
-                            description: '',
-                            createdAt: new Date().toISOString()
-                          };
-                          const currentProducts = JSON.parse(localStorage.getItem('products') || '[]');
-                          localStorage.setItem('products', JSON.stringify([...currentProducts, product]));
-                          setSupplierProducts([...supplierProducts, { ...product, quantity: 1 }]);
-                          setNewProduct({ name: '', price: '', quantity: '' });
-                          setShowNewProduct(false);
-                          fetchProducts();
-                        }
-                      }}>Add</Button>
-                    </Col>
-                  </Row>
-                </Card.Body>
-              </Card>
-            )}
-            
-            {supplierProducts.length > 0 && (
-              <Table size="sm">
-                <thead>
-                  <tr><th>Product</th><th>Cost Price</th><th>Qty</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {supplierProducts.map((item, i) => (
-                    <tr key={i}>
-                      <td>{item.name}</td>
-                      <td>{formatINR(item.costPrice)}</td>
-                      <td>
-                        <Form.Control size="sm" type="number" value={item.quantity} onChange={(e) => {
-                          const updated = [...supplierProducts];
-                          updated[i].quantity = parseInt(e.target.value) || 1;
-                          setSupplierProducts(updated);
-                        }} style={{width: '60px'}} />
-                      </td>
-                      <td><Button size="sm" variant="outline-danger" onClick={() => setSupplierProducts(supplierProducts.filter((_, idx) => idx !== i))}><X size={14} /></Button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            )}
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => {
-            setShowModal(false);
-            setSupplierProducts([]);
-            setShowNewProduct(false);
-          }}>Cancel</Button>
+          <Button variant="outline-secondary" onClick={() => setShowModal(false)}>Cancel</Button>
           <Button variant="primary" onClick={handleAddSupplier}>Add</Button>
         </Modal.Footer>
       </Modal>

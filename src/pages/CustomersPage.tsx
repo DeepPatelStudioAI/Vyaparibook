@@ -68,12 +68,7 @@ export default function CustomersPage() {
     phone: "",
     email: "",
     address: "",
-    balance: "",
-    isPayable: false,
   });
-  const [custProducts, setCustProducts] = useState([]);
-  const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity: '' });
-  const [showNewProduct, setShowNewProduct] = useState(false);
 
   const [showTxModal, setShowTxModal] = useState(false);
   const [txType, setTxType] = useState<"got" | "gave">("got");
@@ -139,14 +134,14 @@ export default function CustomersPage() {
         phone: custForm.phone,
         email: custForm.email,
         address: custForm.address,
-        balance: parseFloat(custForm.balance) || 0,
-        status: custForm.isPayable ? "payable" : "receivable",
+        balance: 0,
+        status: "receivable",
       }),
     });
     const payload = await res.json();
     if (!res.ok) throw new Error(payload.error || payload.message);
     setShowCustModal(false);
-    setCustForm({ name: "", phone: "", email: "", address: "", balance: "", isPayable: false });
+    setCustForm({ name: "", phone: "", email: "", address: "" });
     await fetchCustomers();
   };
 
@@ -530,7 +525,7 @@ export default function CustomersPage() {
       </Row>
 
       {/* Add Customer Modal */}
-      <Modal show={showCustModal} onHide={() => setShowCustModal(false)} centered size="lg">
+      <Modal show={showCustModal} onHide={() => setShowCustModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Add Customer</Modal.Title>
         </Modal.Header>
@@ -585,130 +580,11 @@ export default function CustomersPage() {
                   />
                 </Form.Group>
               </Col>
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Balance</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={custForm.balance}
-                    onChange={(e) =>
-                      setCustForm({ ...custForm, balance: e.target.value })
-                    }
-                  />
-                </Form.Group>
-              </Col>
             </Row>
-            <Form.Check
-              inline
-              type="radio"
-              label="Receivable"
-              checked={!custForm.isPayable}
-              onChange={() => setCustForm({ ...custForm, isPayable: false })}
-            />
-            <Form.Check
-              inline
-              type="radio"
-              label="Payable"
-              checked={custForm.isPayable}
-              onChange={() => setCustForm({ ...custForm, isPayable: true })}
-            />
-            
-            <hr />
-            <h6>Add Products</h6>
-            <Row className="g-2 mb-2">
-              <Col md={6}>
-                <Form.Select onChange={(e) => {
-                  if (e.target.value === 'new') {
-                    setShowNewProduct(true);
-                  } else if (e.target.value) {
-                    const product = products.find(p => p.id === e.target.value);
-                    if (product) {
-                      setCustProducts([...custProducts, { ...product, quantity: 1 }]);
-                    }
-                  }
-                  e.target.value = '';
-                }}>
-                  <option value="">Select Product</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                  <option value="new">+ Add New Product</option>
-                </Form.Select>
-              </Col>
-            </Row>
-            
-            {showNewProduct && (
-              <Card className="mb-3">
-                <Card.Body>
-                  <h6>New Product</h6>
-                  <Row className="g-2">
-                    <Col md={4}>
-                      <Form.Control placeholder="Product Name" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} />
-                    </Col>
-                    <Col md={3}>
-                      <Form.Control type="number" placeholder="Price" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} />
-                    </Col>
-                    <Col md={3}>
-                      <Form.Control type="number" placeholder="Quantity" value={newProduct.quantity} onChange={(e) => setNewProduct({...newProduct, quantity: e.target.value})} />
-                    </Col>
-                    <Col md={2}>
-                      <Button size="sm" onClick={() => {
-                        if (newProduct.name && newProduct.price && newProduct.quantity) {
-                          const product = {
-                            id: Date.now().toString(),
-                            name: newProduct.name,
-                            basePrice: parseFloat(newProduct.price),
-                            costPrice: parseFloat(newProduct.price),
-                            stockQuantity: parseInt(newProduct.quantity),
-                            category: 'purchased',
-                            description: '',
-                            createdAt: new Date().toISOString()
-                          };
-                          const currentProducts = JSON.parse(localStorage.getItem('products') || '[]');
-                          localStorage.setItem('products', JSON.stringify([...currentProducts, product]));
-                          setCustProducts([...custProducts, { ...product, quantity: 1 }]);
-                          setNewProduct({ name: '', price: '', quantity: '' });
-                          setShowNewProduct(false);
-                          fetchProducts();
-                        }
-                      }}>Add</Button>
-                    </Col>
-                  </Row>
-                </Card.Body>
-              </Card>
-            )}
-            
-            {custProducts.length > 0 && (
-              <Table size="sm">
-                <thead>
-                  <tr><th>Product</th><th>Price</th><th>Qty</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {custProducts.map((item, i) => (
-                    <tr key={i}>
-                      <td>{item.name}</td>
-                      <td>{formatINR(item.basePrice)}</td>
-                      <td>
-                        <Form.Control size="sm" type="number" value={item.quantity} onChange={(e) => {
-                          const updated = [...custProducts];
-                          updated[i].quantity = parseInt(e.target.value) || 1;
-                          setCustProducts(updated);
-                        }} style={{width: '60px'}} />
-                      </td>
-                      <td><Button size="sm" variant="outline-danger" onClick={() => setCustProducts(custProducts.filter((_, idx) => idx !== i))}><X size={14} /></Button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            )}
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => {
-            setShowCustModal(false);
-            setCustProducts([]);
-            setShowNewProduct(false);
-          }}>
+          <Button variant="outline-secondary" onClick={() => setShowCustModal(false)}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleAddCustomer}>
