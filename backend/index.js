@@ -32,10 +32,10 @@ async function recalcBalance(customerId) {
     if (r.type === 'gave') gave += parseFloat(r.amount);
     if (r.type === 'got') got += parseFloat(r.amount);
   });
-  const balance = gave - got;
+  const balance = got - gave;
   const status =
-    balance < 0 ? 'receivable' :
-    balance > 0 ? 'payable' :
+    balance > 0 ? 'receivable' :
+    balance < 0 ? 'payable' :
     'settled';
   await db.query(
     `UPDATE customers
@@ -195,17 +195,41 @@ app.get('/api/suppliers/:id/transactions', async (req, res) => {
 app.post('/api/suppliers/:id/transactions', async (req, res) => {
   const supplierId = req.params.id;
   const { type, amount, method = 'Manual', note = null } = req.body;
+  
+  // Debug log
+  console.log('Received supplier transaction:', { supplierId, type, amount, method, note });
+  
   if (!type || typeof amount !== 'number') {
     return res.status(400).json({ error: 'Type and numeric amount are required' });
   }
+
+  // Validate type value
+  const validTypes = ['gave', 'got'];
+  const finalType = validTypes.includes(type) ? type : 'gave';
 
   try {
     const [result] = await db.query(
       `INSERT INTO supplier_transactions
          (supplierId, type, amount, method, note, created_at)
        VALUES (?, ?, ?, ?, ?, NOW())`,
-      [supplierId, type, amount, method, note]
+      [supplierId, finalType, amount, method, note]
     );
+
+    // Recalculate supplier balance
+    // 'gave' increases balance, 'got' decreases balance
+    const [[balanceRow]] = await db.query(
+      `SELECT 
+         SUM(CASE WHEN type = 'gave' THEN amount ELSE 0 END) - 
+         SUM(CASE WHEN type = 'got' THEN amount ELSE 0 END) AS balance
+       FROM supplier_transactions WHERE supplierId = ?`,
+      [supplierId]
+    );
+    const newBalance = balanceRow.balance || 0;
+    await db.query(
+      'UPDATE suppliers SET amount = ? WHERE id = ?',
+      [newBalance, supplierId]
+    );
+
     // Return the newly created row
     const [[newTx]] = await db.query(
       `SELECT id, type, amount, method, note, created_at
@@ -215,8 +239,48 @@ app.post('/api/suppliers/:id/transactions', async (req, res) => {
     );
     res.status(201).json(newTx);
   } catch (err) {
-    console.error(err);
+    console.error('Error adding supplier transaction:', err);
     res.status(500).json({ error: 'Failed to add supplier transaction: ' + err.message });
+  }
+});
+
+//  UPDATE a single supplier transaction
+app.put('/api/transactions/supplier/:txId', async (req, res) => {
+  const txId = req.params.txId;
+  const { type, amount } = req.body;
+  try {
+    // Get supplier ID first
+    const [[tx]] = await db.query(
+      'SELECT supplierId FROM supplier_transactions WHERE id = ?',
+      [txId]
+    );
+    if (!tx) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    await db.query(
+      'UPDATE supplier_transactions SET type = ?, amount = ? WHERE id = ?',
+      [type, amount, txId]
+    );
+
+    // Recalculate supplier balance
+    const [[balanceRow]] = await db.query(
+      `SELECT 
+         SUM(CASE WHEN type = 'gave' THEN amount ELSE 0 END) - 
+         SUM(CASE WHEN type = 'got' THEN amount ELSE 0 END) AS balance
+       FROM supplier_transactions WHERE supplierId = ?`,
+      [tx.supplierId]
+    );
+    const newBalance = balanceRow.balance || 0;
+    await db.query(
+      'UPDATE suppliers SET amount = ? WHERE id = ?',
+      [newBalance, tx.supplierId]
+    );
+
+    res.json({ message: 'Transaction updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update supplier transaction: ' + err.message });
   }
 });
 
@@ -242,7 +306,20 @@ app.delete('/api/transactions/supplier/:txId', async (req, res) => {
 
 // ✅ Add a supplier
 app.post('/api/suppliers', async (req, res) => {
-  const { name, phone, email = null, amount = 0, status = 'active' } = req.body;
+  // Extract data with defaults
+  let { name, phone, email = null, amount = 0, status = 'active' } = req.body;
+  
+  // Debug log
+  console.log('Received supplier data:', { name, phone, email, amount, status });
+  
+  // Force status to be a valid value
+  if (status !== 'active' && status !== 'inactive') {
+    status = 'active';
+  }
+  
+  // Ensure amount is a number
+  amount = parseFloat(amount) || 0;
+  
   try {
     const [result] = await db.query(
       `INSERT INTO suppliers (name, phone, email, amount, status, createdAt)
@@ -257,6 +334,7 @@ app.post('/api/suppliers', async (req, res) => {
 
     res.status(201).json(newSupplier);
   } catch (err) {
+    console.error('Error adding supplier:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -268,6 +346,24 @@ app.get('/api/suppliers', async (req, res) => {
       'SELECT id, name, phone, email, amount AS balance, status, createdAt FROM suppliers ORDER BY createdAt DESC'
     );
     res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Delete supplier with cascade
+app.delete('/api/suppliers/:id/cascade', async (req, res) => {
+  const id = req.params.id;
+  try {
+    // First delete all supplier transactions
+    await db.query('DELETE FROM supplier_transactions WHERE supplierId = ?', [id]);
+    
+    // Then delete the supplier
+    const [result] = await db.query('DELETE FROM suppliers WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -290,43 +386,7 @@ app.delete('/api/suppliers/:id', async (req, res) => {
 // ✅ Get all transactions
 
 
-// POST a new transaction for a given customer
-app.post('/api/customers/:id/transactions', async (req, res) => {
-  const custId = req.params.id;
-  const { type, amount } = req.body;
-  if (!type || typeof amount !== 'number') {
-    return res.status(400).json({ error: 'Type and amount are required' });
-  }
-
-  try {
-    // Find the most‑recent invoiceNumber for this customer
-    const [[inv]] = await db.query(
-      'SELECT invoiceNumber FROM invoices WHERE customerId = ? ORDER BY invoiceNumber DESC LIMIT 1',
-      [custId]
-    );
-    if (!inv) return res.status(404).json({ error: 'No invoice found for customer' });
-
-    // Insert the new transaction
-    await db.query(
-      `INSERT INTO transactions
-         (type, name, invoice_id, amount, method, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        type,
-        '(manual)',            // you can change this
-        inv.invoiceNumber,
-        amount,
-        'Manual',
-        'Added via edit'
-      ]
-    );
-
-    res.status(201).json({ message: 'Transaction added' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
+// This route is already defined above, so we're removing the duplicate
 
 app.get('/api/transactions', async (req, res) => {
   try {
@@ -376,6 +436,34 @@ app.get('/api/customers/:id/transactions', async (req, res) => {
   }
 });
 
+// ✅ Update a transaction and recalculate balance
+// PUT /api/transactions/:id
+app.put('/api/transactions/:id', async (req, res) => {
+  const { id } = req.params;
+  const { type, amount } = req.body;
+  try {
+    // Find customerId so we can recalc
+    const [[tx]] = await db.query(
+      `SELECT i.customerId
+       FROM transactions t
+       JOIN invoices i ON t.invoice_id = i.id
+       WHERE t.id = ?`,
+      [id]
+    );
+    if (!tx) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    await db.query('UPDATE transactions SET type = ?, amount = ? WHERE id = ?', [type, amount, id]);
+    await recalcBalance(tx.customerId);
+
+    res.json({ message: 'Transaction updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ✅ Delete a transaction and update balance
 // DELETE /api/transactions/:id
 app.delete('/api/transactions/:id', async (req, res) => {
@@ -394,7 +482,7 @@ app.delete('/api/transactions/:id', async (req, res) => {
     }
 
     await db.query('DELETE FROM transactions WHERE id = ?', [id]);
-    await recalculateCustomerBalance(tx.customerId);  // your helper above
+    await recalcBalance(tx.customerId);  // your helper above
 
     res.sendStatus(204);
   } catch (err) {
@@ -404,6 +492,12 @@ app.delete('/api/transactions/:id', async (req, res) => {
 });
 
 
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify({ status: 'ok', message: 'Server is running' }));
+});
 
 // ✅ Start server
 app.listen(PORT, async () => {

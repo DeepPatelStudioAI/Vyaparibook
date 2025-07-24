@@ -1,28 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Row, Col, Card, Spinner } from 'react-bootstrap';
 import { Users, Truck, BarChart2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/format';
 
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [totalCustomers, setTotalCustomers] = useState<number>(0);
   const [totalSuppliers, setTotalSuppliers] = useState<number>(0);
   const [totalRevenue, setTotalRevenue] = useState<number>(0);
   const [pendingDues, setPendingDues] = useState<number>(0);
 
-  useEffect(() => {
+  const fetchData = () => {
     // Fetch customer stats
     fetch('http://localhost:3001/api/customers')
       .then(res => res.json())
       .then(data => {
         setTotalCustomers(data.length);
         const receivable = data
-          .filter((c: any) => c.status === 'active')
-          .reduce((sum: number, c: any) => sum + parseFloat(c.balance), 0);
+          .filter((c: any) => c.status === 'receivable')
+          .reduce((sum: number, c: any) => sum + Math.abs(parseFloat(c.balance)), 0);
         const payable = data
           .filter((c: any) => c.status === 'payable')
-          .reduce((sum: number, c: any) => sum + parseFloat(c.balance), 0);
+          .reduce((sum: number, c: any) => sum + Math.abs(parseFloat(c.balance)), 0);
         setTotalRevenue(receivable);
         setPendingDues(payable);
       })
@@ -33,6 +34,14 @@ const DashboardHome: React.FC = () => {
       .then(res => res.json())
       .then(data => setTotalSuppliers(data.length))
       .catch(console.error);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [location.pathname]);
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
   const cards = [

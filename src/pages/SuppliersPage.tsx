@@ -1,12 +1,13 @@
 // src/pages/SuppliersPage.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  Plus, Search, ChevronRight, Truck, TrendingUp, Wallet
+  Plus, Search, ChevronRight, Truck, TrendingUp, Wallet, Trash2, Download, X, Edit3
 } from 'lucide-react';
 import {
-  Modal, Button, Form, Badge, InputGroup, Card, Row, Col
+  Modal, Button, Form, Badge, InputGroup, Card, Row, Col, Table, Spinner
 } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
+import { Product, TransactionItem } from '../types';
 
 interface Supplier {
   id: number;
@@ -23,6 +24,7 @@ interface Transaction {
   type: 'gave' | 'got';
   amount: number;
   created_at: string;
+  items?: TransactionItem[];
 }
 
 const formatINR = (amount: number): string =>
@@ -35,9 +37,19 @@ export default function SuppliersPage() {
   const [selected, setSelected] = useState<Supplier | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', balance: '', isPayable: false });
+  const [supplierProducts, setSupplierProducts] = useState([]);
+  const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity: '' });
+  const [showNewProduct, setShowNewProduct] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transForm, setTransForm] = useState({ amount: '', type: 'gave' });
   const [showTransModal, setShowTransModal] = useState(false);
+  const [loadingTx, setLoadingTx] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [transItems, setTransItems] = useState<TransactionItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const location = useLocation();
 
   const fetchData = async () => {
@@ -50,13 +62,23 @@ export default function SuppliersPage() {
     })));
   };
 
+  const fetchProducts = () => {
+    const stored = localStorage.getItem('products');
+    setProducts(stored ? JSON.parse(stored) : []);
+  };
+
   const fetchTransactions = async (supplierId: number) => {
+    setLoadingTx(true);
     const res = await fetch(`http://localhost:3001/api/suppliers/${supplierId}/transactions`);
     const data = await res.json();
     setTransactions(data);
+    setLoadingTx(false);
   };
 
-  useEffect(() => { fetchData(); }, [location.pathname]);
+  useEffect(() => { 
+    fetchData(); 
+    fetchProducts();
+  }, [location.pathname]);
   useEffect(() => {
     if (selected) fetchTransactions(selected.id);
   }, [selected]);
@@ -88,24 +110,133 @@ export default function SuppliersPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Delete this supplier?')) return;
-    await fetch(`http://localhost:3001/api/suppliers/${id}`, { method: 'DELETE' });
-    fetchData();
-    setSelected(null);
+    if (!window.confirm('Delete this supplier and all related transactions?')) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/suppliers/${id}/cascade`, { method: 'DELETE' });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete supplier');
+      }
+      setSelected(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('Delete failed:', error);
+      alert('Failed to delete supplier: ' + error.message);
+    }
+  };
+
+  const handleDeleteTransaction = async (txId: number) => {
+    if (!window.confirm('Delete this transaction?')) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/transactions/${txId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete transaction');
+      }
+      fetchData();
+      if (selected) fetchTransactions(selected.id);
+    } catch (error: any) {
+      console.error('Delete transaction failed:', error);
+      alert('Failed to delete transaction: ' + error.message);
+    }
+  };
+
+  const addTransactionItem = () => {
+    if (!selectedProduct) return alert('Select a product');
+    const product = products.find(p => p.id === selectedProduct);
+    if (!product) return;
+    if (quantity > product.stockQuantity) return alert('Not enough stock available');
+    
+    const price = transForm.type === 'got' ? product.costPrice : product.basePrice;
+    const item: TransactionItem = {
+      productId: product.id,
+      productName: product.name,
+      quantity,
+      price,
+      total: quantity * price
+    };
+    
+    setTransItems([...transItems, item]);
+    setSelectedProduct('');
+    setQuantity(1);
+  };
+
+  const removeTransactionItem = (index: number) => {
+    setTransItems(transItems.filter((_, i) => i !== index));
+  };
+
+  const getTotalAmount = () => {
+    return transItems.reduce((sum, item) => sum + item.total, 0);
+  };
+
+  const updateInventory = (items: TransactionItem[], type: 'gave' | 'got') => {
+    const currentProducts = JSON.parse(localStorage.getItem('products') || '[]');
+    const updatedProducts = currentProducts.map((product: Product) => {
+      const item = items.find(i => i.productId === product.id);
+      if (item) {
+        // For suppliers: 'got' means we received stock, 'gave' means we gave stock
+        const newStock = type === 'got' 
+          ? product.stockQuantity + item.quantity 
+          : product.stockQuantity - item.quantity;
+        return { ...product, stockQuantity: Math.max(0, newStock) };
+      }
+      return product;
+    });
+    localStorage.setItem('products', JSON.stringify(updatedProducts));
+    fetchProducts();
+    // Trigger storage event for other tabs/components
+    window.dispatchEvent(new Event('storage'));
   };
 
   const handleAddTransaction = async () => {
-    const amount = parseFloat(transForm.amount);
-    if (!amount || amount <= 0) return alert('Enter a valid amount');
+    const totalAmount = getTotalAmount();
+    if (transItems.length === 0 && !parseFloat(transForm.amount)) {
+      return alert('Add items or enter amount');
+    }
 
+    const amount = transItems.length > 0 ? totalAmount : parseFloat(transForm.amount);
+    
     await fetch(`http://localhost:3001/api/suppliers/${selected?.id}/transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, type: transForm.type }),
+      body: JSON.stringify({ 
+        amount, 
+        type: transForm.type,
+        items: transItems.length > 0 ? transItems : undefined
+      }),
     });
 
+    // Update inventory if items were selected
+    if (transItems.length > 0) {
+      updateInventory(transItems, transForm.type);
+    }
+
     setTransForm({ amount: '', type: 'gave' });
+    setTransItems([]);
     setShowTransModal(false);
+    fetchData();
+    if (selected) fetchTransactions(selected.id);
+  };
+
+  const handleEditTransaction = async () => {
+    if (!editingTx || !selected) return;
+    
+    const res = await fetch(
+      `http://localhost:3001/api/transactions/supplier/${editingTx.id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          type: transForm.type, 
+          amount: parseFloat(transForm.amount)
+        }),
+      }
+    );
+    
+    if (!res.ok) return alert("Failed to update transaction");
+    
+    setShowEditModal(false);
+    setEditingTx(null);
     fetchData();
     if (selected) fetchTransactions(selected.id);
   };
@@ -202,32 +333,80 @@ export default function SuppliersPage() {
             <Card.Body>
               {selected ? (
                 <>
-                  <h5 className="text-primary fw-bold mb-3">{selected.name}</h5>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5 className="text-primary mb-0">{selected.name}</h5>
+                    <div className="d-flex gap-2">
+                      <Button size="sm" variant="outline-primary" onClick={() => setShowTransModal(true)}>
+                        + Transaction
+                      </Button>
+                      <Button size="sm" variant="outline-danger" onClick={() => handleDelete(selected.id)}>
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
                   <p><strong>Phone:</strong> {selected.phone}</p>
                   <p><strong>Email:</strong> {selected.email}</p>
                   <p><strong>Balance:</strong> {formatINR(selected.balance)}</p>
                   <p><strong>Status:</strong> <Badge bg={selected.status === 'receivable' ? 'success' : 'danger'}>{selected.status.toUpperCase()}</Badge></p>
                   <p><strong>Created:</strong> {new Date(selected.createdAt).toLocaleDateString()}</p>
-                  <Button variant="outline-primary" className="me-2" onClick={() => setShowTransModal(true)}>Add Transaction</Button>
-                  <Button variant="outline-danger" onClick={() => handleDelete(selected.id)}>Delete</Button>
-
+                  
                   <hr />
-                  <h6 className="fw-bold">Transactions</h6>
-                  {transactions.length === 0 ? (
+                  <h6 className="fw-bold">Transaction History</h6>
+                  {loadingTx ? (
+                    <div className="text-center"><Spinner size="sm" /></div>
+                  ) : transactions.length === 0 ? (
                     <p className="text-muted">No transactions found.</p>
                   ) : (
-                    <ul className="list-unstyled mt-2">
-                      {transactions.map(tx => (
-                        <li key={tx.id} className="mb-2 d-flex justify-content-between">
-                          <span>{tx.type === 'gave' ? 'You gave' : 'You got'} - {formatINR(tx.amount)}</span>
-                          <small className="text-muted">{new Date(tx.created_at).toLocaleDateString()}</small>
-                        </li>
-                      ))}
-                    </ul>
+                    <Table striped bordered size="sm" responsive>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th className="text-danger text-end">You Gave</th>
+                          <th className="text-success text-end">You Got</th>
+                          <th className="text-center">Edit</th>
+                          <th className="text-center">Delete</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transactions.map(tx => {
+                          const gave = tx.type === 'gave' ? tx.amount : 0;
+                          const got = tx.type === 'got' ? tx.amount : 0;
+                          return (
+                            <tr key={tx.id}>
+                              <td>{new Date(tx.created_at).toLocaleDateString()}</td>
+                              <td className="text-danger text-end">{gave ? formatINR(gave) : '—'}</td>
+                              <td className="text-success text-end">{got ? formatINR(got) : '—'}</td>
+                              <td className="text-center">
+                                <Button
+                                  size="sm"
+                                  variant="outline-secondary"
+                                  onClick={() => {
+                                    setEditingTx(tx);
+                                    setTransForm({ ...transForm, type: tx.type, amount: tx.amount.toString() });
+                                    setShowEditModal(true);
+                                  }}
+                                >
+                                  <Edit3 size={14} />
+                                </Button>
+                              </td>
+                              <td className="text-center">
+                                <Button
+                                  size="sm"
+                                  variant="outline-danger"
+                                  onClick={() => handleDeleteTransaction(tx.id)}
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </Table>
                   )}
                 </>
               ) : (
-                <div className="text-center text-muted">Select a supplier to view details</div>
+                <div className="text-center text-muted mt-5">Select a supplier to view details</div>
               )}
             </Card.Body>
           </Card>
@@ -235,7 +414,7 @@ export default function SuppliersPage() {
       </Row>
 
       {/* Add Supplier Modal */}
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
         <Modal.Header closeButton><Modal.Title>Add Supplier</Modal.Title></Modal.Header>
         <Modal.Body>
           <Form>
@@ -268,34 +447,219 @@ export default function SuppliersPage() {
             </Row>
             <Form.Check className="mt-3" inline label="Receivable" type="radio" checked={!form.isPayable} onChange={() => setForm({ ...form, isPayable: false })} />
             <Form.Check inline label="Payable" type="radio" checked={form.isPayable} onChange={() => setForm({ ...form, isPayable: true })} />
+            
+            <hr />
+            <h6>Add Products</h6>
+            <Row className="g-2 mb-2">
+              <Col md={6}>
+                <Form.Select onChange={(e) => {
+                  if (e.target.value === 'new') {
+                    setShowNewProduct(true);
+                  } else if (e.target.value) {
+                    const product = products.find(p => p.id === e.target.value);
+                    if (product) {
+                      setSupplierProducts([...supplierProducts, { ...product, quantity: 1 }]);
+                    }
+                  }
+                  e.target.value = '';
+                }}>
+                  <option value="">Select Product</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                  <option value="new">+ Add New Product</option>
+                </Form.Select>
+              </Col>
+            </Row>
+            
+            {showNewProduct && (
+              <Card className="mb-3">
+                <Card.Body>
+                  <h6>New Product</h6>
+                  <Row className="g-2">
+                    <Col md={4}>
+                      <Form.Control placeholder="Product Name" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} />
+                    </Col>
+                    <Col md={3}>
+                      <Form.Control type="number" placeholder="Cost Price" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} />
+                    </Col>
+                    <Col md={3}>
+                      <Form.Control type="number" placeholder="Quantity" value={newProduct.quantity} onChange={(e) => setNewProduct({...newProduct, quantity: e.target.value})} />
+                    </Col>
+                    <Col md={2}>
+                      <Button size="sm" onClick={() => {
+                        if (newProduct.name && newProduct.price && newProduct.quantity) {
+                          const product = {
+                            id: Date.now().toString(),
+                            name: newProduct.name,
+                            basePrice: parseFloat(newProduct.price) * 1.2,
+                            costPrice: parseFloat(newProduct.price),
+                            stockQuantity: parseInt(newProduct.quantity),
+                            category: 'purchased',
+                            description: '',
+                            createdAt: new Date().toISOString()
+                          };
+                          const currentProducts = JSON.parse(localStorage.getItem('products') || '[]');
+                          localStorage.setItem('products', JSON.stringify([...currentProducts, product]));
+                          setSupplierProducts([...supplierProducts, { ...product, quantity: 1 }]);
+                          setNewProduct({ name: '', price: '', quantity: '' });
+                          setShowNewProduct(false);
+                          fetchProducts();
+                        }
+                      }}>Add</Button>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            )}
+            
+            {supplierProducts.length > 0 && (
+              <Table size="sm">
+                <thead>
+                  <tr><th>Product</th><th>Cost Price</th><th>Qty</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {supplierProducts.map((item, i) => (
+                    <tr key={i}>
+                      <td>{item.name}</td>
+                      <td>{formatINR(item.costPrice)}</td>
+                      <td>
+                        <Form.Control size="sm" type="number" value={item.quantity} onChange={(e) => {
+                          const updated = [...supplierProducts];
+                          updated[i].quantity = parseInt(e.target.value) || 1;
+                          setSupplierProducts(updated);
+                        }} style={{width: '60px'}} />
+                      </td>
+                      <td><Button size="sm" variant="outline-danger" onClick={() => setSupplierProducts(supplierProducts.filter((_, idx) => idx !== i))}><X size={14} /></Button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowModal(false)}>Cancel</Button>
+          <Button variant="outline-secondary" onClick={() => {
+            setShowModal(false);
+            setSupplierProducts([]);
+            setShowNewProduct(false);
+          }}>Cancel</Button>
           <Button variant="primary" onClick={handleAddSupplier}>Add</Button>
         </Modal.Footer>
       </Modal>
 
       {/* Add Transaction Modal */}
-      <Modal show={showTransModal} onHide={() => setShowTransModal(false)} centered>
+      <Modal show={showTransModal} onHide={() => setShowTransModal(false)} centered size="lg">
         <Modal.Header closeButton><Modal.Title>Add Transaction</Modal.Title></Modal.Header>
         <Modal.Body>
           <Form>
-            <Form.Group className="mb-3"><Form.Label>Amount</Form.Label>
+            <Row className="mb-3">
+              <Col>
+                <Form.Check inline label="You Gave" type="radio" checked={transForm.type === 'gave'} onChange={() => setTransForm({ ...transForm, type: 'gave' })} />
+                <Form.Check inline label="You Got" type="radio" checked={transForm.type === 'got'} onChange={() => setTransForm({ ...transForm, type: 'got' })} />
+              </Col>
+            </Row>
+            
+            {transForm.type === 'gave' && (
+              <Card className="mb-3">
+                <Card.Header><strong>Add Products</strong></Card.Header>
+                <Card.Body>
+                  <Row className="g-2">
+                    <Col md={6}>
+                      <Form.Select value={selectedProduct} onChange={e => setSelectedProduct(e.target.value)}>
+                        <option value="">Select Product</option>
+                        {products.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} (Stock: {p.stockQuantity})</option>
+                        ))}
+                      </Form.Select>
+                    </Col>
+                    <Col md={3}>
+                      <Form.Control type="number" min="1" value={quantity} onChange={e => setQuantity(parseInt(e.target.value) || 1)} placeholder="Qty" />
+                    </Col>
+                    <Col md={3}>
+                      <Button variant="outline-primary" onClick={addTransactionItem} disabled={!selectedProduct}>Add</Button>
+                    </Col>
+                  </Row>
+                  
+                  {transItems.length > 0 && (
+                    <Table size="sm" className="mt-3">
+                      <thead>
+                        <tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th><th></th></tr>
+                      </thead>
+                      <tbody>
+                        {transItems.map((item, i) => (
+                          <tr key={i}>
+                            <td>{item.productName}</td>
+                            <td>{item.quantity}</td>
+                            <td>{formatINR(item.price)}</td>
+                            <td>{formatINR(item.total)}</td>
+                            <td><Button size="sm" variant="outline-danger" onClick={() => removeTransactionItem(i)}><X size={14} /></Button></td>
+                          </tr>
+                        ))}
+                        <tr className="table-info">
+                          <td colSpan={3}><strong>Total</strong></td>
+                          <td><strong>{formatINR(getTotalAmount())}</strong></td>
+                          <td></td>
+                        </tr>
+                      </tbody>
+                    </Table>
+                  )}
+                </Card.Body>
+              </Card>
+            )}
+            
+            <Form.Group><Form.Label>{transForm.type === 'got' ? 'Cash Amount' : 'Manual Amount (if no products)'}</Form.Label>
               <Form.Control type="text" value={transForm.amount} onChange={e => {
                 const v = e.target.value;
                 if (v === '' || /^\d*\.?\d*$/.test(v)) {
                   setTransForm(prev => ({ ...prev, amount: v }));
                 }
-              }} />
+              }} disabled={transForm.type === 'gave' && transItems.length > 0} />
             </Form.Group>
-            <Form.Check inline label="You Gave" type="radio" checked={transForm.type === 'gave'} onChange={() => setTransForm({ ...transForm, type: 'gave' })} />
-            <Form.Check inline label="You Got" type="radio" checked={transForm.type === 'got'} onChange={() => setTransForm({ ...transForm, type: 'got' })} />
           </Form>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setShowTransModal(false)}>Cancel</Button>
-          <Button variant="primary" onClick={handleAddTransaction}>Add</Button>
+          <Button variant="primary" onClick={handleAddTransaction}>Add Transaction</Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Edit Transaction Modal */}
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Edit Transaction</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Type</Form.Label>
+              <div>
+                <Form.Check inline label="You Gave" type="radio" checked={transForm.type === 'gave'} onChange={() => setTransForm({ ...transForm, type: 'gave' })} />
+                <Form.Check inline label="You Got" type="radio" checked={transForm.type === 'got'} onChange={() => setTransForm({ ...transForm, type: 'got' })} />
+              </div>
+            </Form.Group>
+            <Form.Group>
+              <Form.Label>Amount</Form.Label>
+              <Form.Control
+                type="text"
+                value={transForm.amount}
+                onChange={e => {
+                  const v = e.target.value;
+                  if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                    setTransForm(prev => ({ ...prev, amount: v }));
+                  }
+                }}
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => setShowEditModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleEditTransaction}>
+            Update
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>

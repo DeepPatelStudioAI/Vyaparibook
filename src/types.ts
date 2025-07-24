@@ -29,13 +29,25 @@ export interface Transaction {
     type: 'got' | 'gave';
     invoiceNumber: number;
     amount: number;
+    items?: TransactionItem[];
   }
   export interface Product {
-    id: number;
+    id: string;
     name: string;
-    price: number;
+    description: string;
+    basePrice: number;
+    costPrice: number;
     stockQuantity: number;
+    category: 'manufactured' | 'purchased';
     createdAt: string;
+  }
+
+  export interface TransactionItem {
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    total: number;
   }
   
   export interface Invoice {
