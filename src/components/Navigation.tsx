@@ -8,7 +8,7 @@ import {
   Receipt, 
   CreditCard, 
   FileText, 
-  Activity 
+  Settings 
 } from 'lucide-react';
 
 const Navigation = () => {
@@ -21,6 +21,7 @@ const Navigation = () => {
     { path: '/dashboard/inventory', label: 'Inventory', icon: Receipt },
     { path: '/dashboard/transactions', label: 'Transactions', icon: CreditCard },
     { path: '/dashboard/reports', label: 'Reports', icon: FileText },
+    { path: '/dashboard/settings', label: 'Settings', icon: Settings },
   ];
 
   return (

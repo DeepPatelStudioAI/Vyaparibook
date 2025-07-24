@@ -99,14 +99,21 @@ const InventoryPage: React.FC = () => {
     <div className="p-4">
           
       {/* Header */}
-      <Row className="align-items-center mb-4">
-        <Col><h2 className="text-primary">Inventory</h2></Col>
-        <Col className="text-end">
-          <Button variant="outline-primary" onClick={() => openModal()}>
-            <Plus className="me-1" /> Add Product
-          </Button>
-        </Col>
-      </Row>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 className="text-primary fw-bold mb-1">Inventory</h2>
+          <p className="text-muted mb-0">Manage your product inventory</p>
+        </div>
+        <Button 
+          variant="primary" 
+          size="lg" 
+          onClick={() => openModal()}
+          className="shadow-sm"
+          style={{ borderRadius: '12px' }}
+        >
+          <Plus className="me-2" size={20} /> Add Product
+        </Button>
+      </div>
 
       {/* Summary Cards */}
       <Row className="g-3 mb-4">
@@ -117,13 +124,21 @@ const InventoryPage: React.FC = () => {
           { title: 'Categories', val: categories, icon: <Package />, bg: 'warning' },
         ].map((c, i) => (
           <Col md={3} key={i}>
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Header className={`bg-${c.bg} text-white d-flex align-items-center justify-content-between`}>
-                <span className="fw-semibold">{c.title}</span>
-                <div>{c.icon}</div>
-              </Card.Header>
-              <Card.Body>
-                <h4 className="mb-0">{c.val}</h4>
+            <Card className="h-100 border-0 shadow-sm" style={{ 
+              borderRadius: '16px', 
+              transition: 'transform 0.2s', 
+              cursor: 'pointer' 
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+              <Card.Body className="p-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className={`bg-${c.bg} bg-opacity-10 p-3 rounded-circle`}>
+                    <div className={`text-${c.bg}`}>{c.icon}</div>
+                  </div>
+                  <div className={`text-${c.bg} text-uppercase small fw-bold opacity-75`}>{c.title}</div>
+                </div>
+                <h3 className="fw-bold mb-0">{c.val}</h3>
               </Card.Body>
             </Card>
           </Col>
@@ -131,83 +146,129 @@ const InventoryPage: React.FC = () => {
       </Row>
 
       {/* Search & Filter */}
-      <Card className="mb-4 shadow-sm">
-        <Card.Body>
-          <Row className="g-3">
-            <Col md={6}>
-              <InputGroup>
-                <InputGroup.Text><Search /></InputGroup.Text>
-                <Form.Control
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
-            </Col>
-            <Col md={3}>
-              <Form.Select value={filterCat} onChange={e => setFilterCat(e.target.value as any)}>
-                <option value="all">All Categories</option>
-                <option value="manufactured">Manufactured</option>
-                <option value="purchased">Purchased</option>
-              </Form.Select>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
+      <div className="mb-4">
+        <Row className="g-3">
+          <Col md={8}>
+            <InputGroup size="lg" className="shadow-sm" style={{ borderRadius: '12px' }}>
+              <InputGroup.Text className="bg-white border-end-0" style={{ borderRadius: '12px 0 0 12px' }}>
+                <Search className="text-muted" size={20} />
+              </InputGroup.Text>
+              <Form.Control
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="border-start-0 border-end-0"
+                style={{ fontSize: '16px' }}
+              />
+            </InputGroup>
+          </Col>
+          <Col md={4}>
+            <Form.Select
+              size="lg"
+              value={filterCat}
+              onChange={e => setFilterCat(e.target.value as any)}
+              className="shadow-sm"
+              style={{ borderRadius: '12px', fontSize: '16px' }}
+            >
+              <option value="all">All Categories</option>
+              <option value="manufactured">Manufactured</option>
+              <option value="purchased">Purchased</option>
+            </Form.Select>
+          </Col>
+        </Row>
+      </div>
 
       {/* Products Table */}
-      <Card className="shadow-sm">
-        <Card.Header className="bg-white border-bottom-0">
-          <h5 className="mb-0">Products</h5>
+      <Card className="shadow-sm border-0" style={{ borderRadius: '16px' }}>
+        <Card.Header className="bg-white border-0 p-4">
+          <h5 className="mb-0 fw-bold">Products</h5>
         </Card.Header>
         <Card.Body className="p-0">
-          <Table hover responsive className="mb-0">
-            <thead className="table-light">
-              <tr>
-                <th>Product</th>
-                <th>Category</th>
-                <th>Base Price</th>
-                <th>Cost Price</th>
-                <th>Stock</th>
-                <th className="text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map(p => (
-                <tr key={p.id}>
-                  <td>
-                    <div className="fw-semibold">{p.name}</div>
-                    <div className="text-muted small">{p.description}</div>
-                  </td>
-                  <td>
-                    <Badge bg={p.category === 'manufactured' ? 'info' : 'secondary'} pill>
-                      {p.category.charAt(0).toUpperCase() + p.category.slice(1)}
-                    </Badge>
-                  </td>
-                  <td>{formatCurrency(p.basePrice!)}</td>
-                  <td>{formatCurrency(p.costPrice!)}</td>
-                  <td>
-                    <InputGroup size="sm" className="w-50">
-                      <Form.Control
-                        type="number"
-                        value={p.stockQuantity}
-                        onChange={e => updateStock(p.id, +e.target.value)}
-                      />
-                      {p.stockQuantity! < 5 && <InputGroup.Text className="bg-danger text-white"><AlertTriangle /></InputGroup.Text>}
-                    </InputGroup>
-                  </td>
-                  <td className="text-end">
-                    <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => openModal(p)}>
-                      <Edit3 />
-                    </Button>
-                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(p.id)}>
-                      <Trash2 />
-                    </Button>
-                  </td>
+          {list.length === 0 ? (
+            <div className="text-center py-5">
+              <Package size={48} className="text-muted mb-3" />
+              <p className="text-muted">No products found</p>
+            </div>
+          ) : (
+            <Table hover responsive className="mb-0">
+              <thead className="bg-light">
+                <tr>
+                  <th className="border-0 p-4 fw-bold">Product</th>
+                  <th className="border-0 p-4 fw-bold">Category</th>
+                  <th className="border-0 p-4 fw-bold">Base Price</th>
+                  <th className="border-0 p-4 fw-bold">Cost Price</th>
+                  <th className="border-0 p-4 fw-bold">Stock</th>
+                  <th className="border-0 p-4 fw-bold text-end">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
+              </thead>
+              <tbody>
+                {list.map(p => (
+                  <tr key={p.id} style={{ transition: 'background-color 0.2s' }}>
+                    <td className="p-4">
+                      <div className="d-flex align-items-center">
+                        <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${
+                          p.category === 'manufactured' ? 'bg-info bg-opacity-10' : 'bg-secondary bg-opacity-10'
+                        }`} style={{ width: '40px', height: '40px' }}>
+                          <Package className={p.category === 'manufactured' ? 'text-info' : 'text-secondary'} size={16} />
+                        </div>
+                        <div>
+                          <div className="fw-bold">{p.name}</div>
+                          <div className="text-muted small">{p.description}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <Badge 
+                        bg={p.category === 'manufactured' ? 'info' : 'secondary'} 
+                        className="px-3 py-2"
+                        style={{ borderRadius: '8px' }}
+                      >
+                        {p.category.charAt(0).toUpperCase() + p.category.slice(1)}
+                      </Badge>
+                    </td>
+                    <td className="p-4 fw-semibold">{formatCurrency(p.basePrice!)}</td>
+                    <td className="p-4 fw-semibold">{formatCurrency(p.costPrice!)}</td>
+                    <td className="p-4">
+                      <div className="d-flex align-items-center">
+                        <InputGroup size="sm" style={{ maxWidth: '100px' }}>
+                          <Form.Control
+                            type="number"
+                            value={p.stockQuantity}
+                            onChange={e => updateStock(p.id, +e.target.value)}
+                            style={{ borderRadius: '8px' }}
+                          />
+                        </InputGroup>
+                        {p.stockQuantity! < 5 && (
+                          <div className="ms-2 text-danger">
+                            <AlertTriangle size={16} />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 text-end">
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm" 
+                        className="me-2" 
+                        onClick={() => openModal(p)}
+                        style={{ borderRadius: '8px' }}
+                      >
+                        <Edit3 size={14} />
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm" 
+                        onClick={() => handleDelete(p.id)}
+                        style={{ borderRadius: '8px' }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
         </Card.Body>
       </Card>
 
