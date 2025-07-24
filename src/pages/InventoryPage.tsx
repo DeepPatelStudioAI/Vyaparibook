@@ -4,6 +4,7 @@ import {
   Plus, Search, Edit3, Trash2, Package, AlertTriangle, TrendingUp,
 } from 'lucide-react';
 import { Modal, Button, Form, Badge, InputGroup, Row, Col, Card, Table } from 'react-bootstrap';
+import { useLocation } from 'react-router-dom';
 import { Product } from '../types';
 
 // Formatting helper
@@ -19,17 +20,31 @@ const InventoryPage: React.FC = () => {
   const [form, setForm] = useState<Partial<Product>>({
     name: '', description: '', basePrice: 0, costPrice: 0, stockQuantity: 0, category: 'manufactured',
   });
+  const location = useLocation();
 
-  // load
-  useEffect(() => {
+  // load and refresh on location change
+  const loadProducts = () => {
     const ls = localStorage.getItem('products');
     setProducts(ls ? JSON.parse(ls) : []);
-  }, []);
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, [location.pathname]);
 
   const save = (list: Product[]) => {
     setProducts(list);
     localStorage.setItem('products', JSON.stringify(list));
   };
+
+  // Add refresh function for external updates
+  useEffect(() => {
+    const handleStorageChange = () => {
+      loadProducts();
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // stats
   const total = products.length;
