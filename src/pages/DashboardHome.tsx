@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Row, Col, Card, Spinner } from 'react-bootstrap';
 import { Users, Truck, BarChart2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/format';
-
+// # trial
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
