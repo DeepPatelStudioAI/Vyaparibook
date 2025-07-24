@@ -70,15 +70,21 @@ app.post('/api/customers', async (req, res) => {
     );
     const customerId = ins.insertId;
 
-    // 2) create an invoice record
+    // 2) Get next invoice number (starting from 1001)
+    const [[maxInvoice]] = await db.query(
+      'SELECT COALESCE(MAX(invoice_number), 1000) as maxNum FROM invoices'
+    );
+    const nextInvoiceNumber = maxInvoice.maxNum + 1;
+
+    // 3) create an invoice record with custom invoice number
     const [invIns] = await db.query(
-      `INSERT INTO invoices (customerId, total, status, createdAt)
-       VALUES (?, ?, ?, NOW())`,
-      [customerId, balance, status]
+      `INSERT INTO invoices (customerId, invoice_number, total, status, createdAt)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [customerId, nextInvoiceNumber, balance, status]
     );
     const invoiceId = invIns.insertId;
 
-    // 3) create an initial transaction
+    // 4) create an initial transaction
     await db.query(
       `INSERT INTO transactions
          (type, name, invoice_id, amount, method, note, created_at)
@@ -118,52 +124,51 @@ app.delete('/api/customers/:id', async (req, res) => {
   }
 });
 
-// GET all transactions for one customer
-// GET /api/customers/:id/transactions
-app.get('/api/customers/:id/transactions', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [transactions] = await db.query(
-      `SELECT
-         t.id,
-         t.created_at,
-         t.type,
-         i.id   AS invoiceId,
-         t.amount
-       FROM transactions t
-       JOIN invoices i
-         ON t.invoice_id = i.id
-       WHERE i.customerId = ?
-       ORDER BY t.created_at DESC`,
-      [id]
-    );
-    res.json(transactions);
-  } catch (err) {
-    res
-      .status(500)
-      .json({ error: 'Failed to fetch transactions: ' + err.message });
-  }
-});
+
 
 
 // POST a manual transaction for a customer
 app.post('/api/customers/:id/transactions', async (req, res) => {
   const cust = req.params.id;
-  const { type, amount, date } = req.body;
+  const { type, amount, date, items } = req.body;
   try {
     // find the latest invoice for that customer
     const [[inv]] = await db.query(
       'SELECT id FROM invoices WHERE customerId = ? ORDER BY id DESC LIMIT 1',
       [cust]
     );
-    if (!inv) return res.status(404).json({ error: 'No invoice found' });
+    if (!inv) {
+      // If no invoice exists, create one with next invoice number
+      const [[maxInvoice]] = await db.query(
+        'SELECT COALESCE(MAX(invoice_number), 1000) as maxNum FROM invoices'
+      );
+      const nextInvoiceNumber = maxInvoice.maxNum + 1;
+      
+      const [invIns] = await db.query(
+        `INSERT INTO invoices (customerId, invoice_number, total, status, createdAt)
+         VALUES (?, ?, ?, 'settled', NOW())`,
+        [cust, nextInvoiceNumber, 0]
+      );
+      inv = { id: invIns.insertId };
+    }
 
-    await db.query(
+    const [txResult] = await db.query(
       `INSERT INTO transactions
          (type, name, invoice_id, amount, method, note, created_at)
        VALUES (?, (SELECT name FROM customers WHERE id=?), ?, ?, 'Manual', 'Manual', ?)`,
       [type, cust, inv.id, amount, date || new Date()]
     );
+
+    // Store transaction items if provided
+    if (items && items.length > 0) {
+      for (const item of items) {
+        await db.query(
+          `INSERT INTO transaction_items (transaction_id, product_name, quantity, price, total)
+           VALUES (?, ?, ?, ?, ?)`,
+          [txResult.insertId, item.productName, item.quantity, item.price, item.total]
+        );
+      }
+    }
 
     await recalcBalance(cust);
     res.status(201).json({ message: 'Transaction added' });
@@ -184,6 +189,17 @@ app.get('/api/suppliers/:id/transactions', async (req, res) => {
          ORDER BY created_at DESC`,
       [supplierId]
     );
+
+    // Get items for each transaction
+    for (let tx of rows) {
+      const [items] = await db.query(
+        `SELECT product_name as productName, quantity, price, total
+         FROM supplier_transaction_items WHERE supplier_transaction_id = ?`,
+        [tx.id]
+      );
+      tx.items = items;
+    }
+
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -194,10 +210,10 @@ app.get('/api/suppliers/:id/transactions', async (req, res) => {
 //  POST a new transaction for a supplier
 app.post('/api/suppliers/:id/transactions', async (req, res) => {
   const supplierId = req.params.id;
-  const { type, amount, method = 'Manual', note = null } = req.body;
+  const { type, amount, method = 'Manual', note = null, items } = req.body;
   
   // Debug log
-  console.log('Received supplier transaction:', { supplierId, type, amount, method, note });
+  console.log('Received supplier transaction:', { supplierId, type, amount, method, note, items });
   
   if (!type || typeof amount !== 'number') {
     return res.status(400).json({ error: 'Type and numeric amount are required' });
@@ -214,6 +230,17 @@ app.post('/api/suppliers/:id/transactions', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, NOW())`,
       [supplierId, finalType, amount, method, note]
     );
+
+    // Store transaction items if provided
+    if (items && items.length > 0) {
+      for (const item of items) {
+        await db.query(
+          `INSERT INTO supplier_transaction_items (supplier_transaction_id, product_name, quantity, price, total)
+           VALUES (?, ?, ?, ?, ?)`,
+          [result.insertId, item.productName, item.quantity, item.price, item.total]
+        );
+      }
+    }
 
     // Recalculate supplier balance
     // 'gave' increases balance, 'got' decreases balance
@@ -397,7 +424,7 @@ app.get('/api/transactions', async (req, res) => {
          t.type,
          c.name AS customerName,
          c.id   AS customerId,
-         i.id   AS invoiceNumber,
+         COALESCE(i.invoice_number, i.id) AS invoiceNumber,
          t.amount,
          t.method,
          t.note
@@ -421,7 +448,7 @@ app.get('/api/customers/:id/transactions', async (req, res) => {
          t.id,
          t.created_at AS created_at,
          t.type,
-         i.id         AS invoiceId,
+         COALESCE(i.invoice_number, i.id) AS invoiceId,
          t.amount
        FROM transactions t
        JOIN invoices i ON t.invoice_id = i.id
@@ -429,6 +456,17 @@ app.get('/api/customers/:id/transactions', async (req, res) => {
        ORDER BY t.created_at DESC`,
       [id]
     );
+
+    // Get items for each transaction
+    for (let tx of transactions) {
+      const [items] = await db.query(
+        `SELECT product_name as productName, quantity, price, total
+         FROM transaction_items WHERE transaction_id = ?`,
+        [tx.id]
+      );
+      tx.items = items;
+    }
+
     res.json(transactions);
   } catch (err) {
     console.error(err);

@@ -44,12 +44,16 @@ export default function ReportsPage() {
 
   const location = useLocation();
 
+  const [transactionType, setTransactionType] = useState<'all' | 'got' | 'gave'>('all');
+
   // Preselect customerId from URL (e.g. /dashboard/reports?customerId=2)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const type = params.get('type'); // 'got' or 'gave'
     const cid = params.get('customerId');
     if (cid) setSelectedId(Number(cid));
+    if (type === 'got' || type === 'gave') setTransactionType(type);
+    else setTransactionType('all');
   }, [location.search]);
 
   // Load customers and business settings
@@ -74,15 +78,19 @@ export default function ReportsPage() {
     setLoadingTx(true);
     fetch(`http://localhost:3001/api/customers/${selectedId}/transactions`)
       .then(r => r.json())
-      .then(setTransactions)
+      .then(data => {
+        // Filter transactions based on type
+        const filtered = transactionType === 'all' ? data : data.filter(tx => tx.type === transactionType);
+        setTransactions(filtered);
+      })
       .catch(console.error)
       .finally(() => setLoadingTx(false));
-  }, [selectedId]);
+  }, [selectedId, transactionType]);
 
   const customer = customers.find(c => c.id === selectedId);
   const invoiceNum = selectedId ? `INV-${selectedId}-${Date.now().toString().slice(-6)}` : undefined;
 
-  const subtotal = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+  const subtotal = transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
   const gstAmt = subtotal * gstPct / 100;
   const afterGst = subtotal + gstAmt;
   const discountAmt = afterGst * discountPct / 100;
@@ -118,7 +126,14 @@ export default function ReportsPage() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="text-primary fw-bold mb-1">Customer Invoice</h2>
-          <p className="text-muted mb-0">Generate and download customer invoices</p>
+          <p className="text-muted mb-0">
+            Generate and download customer invoices
+            {transactionType !== 'all' && (
+              <span className={`badge ms-2 bg-${transactionType === 'got' ? 'success' : 'danger'}`}>
+                {transactionType.toUpperCase()} Only
+              </span>
+            )}
+          </p>
         </div>
         <Button 
           variant="primary" 
@@ -267,7 +282,7 @@ export default function ReportsPage() {
                 <thead className="bg-light">
                   <tr>
                     <th className="border-0 p-3 fw-bold">#</th>
-                    <th className="border-0 p-3 fw-bold">Description</th>
+                    <th className="border-0 p-3 fw-bold">Product/Description</th>
                     <th className="border-0 p-3 fw-bold text-center">Qty</th>
                     <th className="border-0 p-3 fw-bold text-end">Amount</th>
                   </tr>
@@ -281,21 +296,43 @@ export default function ReportsPage() {
                       </td>
                     </tr>
                   ) : (
-                    transactions.map((tx, i) => (
-                      <tr key={tx.id}>
-                        <td className="p-3">{i + 1}</td>
-                        <td className="p-3">
-                          <div className="d-flex align-items-center">
-                            <Badge bg={tx.type === 'got' ? 'success' : 'danger'} className="me-2">
-                              {tx.type.toUpperCase()}
-                            </Badge>
-                            Transaction
-                          </div>
-                        </td>
-                        <td className="p-3 text-center">1</td>
-                        <td className="p-3 text-end fw-semibold">{formatCurrency(tx.amount)}</td>
-                      </tr>
-                    ))
+                    transactions.map((tx, i) => {
+                      // If transaction has items, show each item separately
+                      if (tx.items && tx.items.length > 0) {
+                        return tx.items.map((item, itemIndex) => (
+                          <tr key={`${tx.id}-${itemIndex}`}>
+                            <td className="p-3">{itemIndex === 0 ? i + 1 : ''}</td>
+                            <td className="p-3">
+                              <div className="d-flex align-items-center">
+                                <Badge bg={tx.type === 'got' ? 'success' : 'danger'} className="me-2">
+                                  {tx.type.toUpperCase()}
+                                </Badge>
+                                {item.productName}
+                              </div>
+                            </td>
+                            <td className="p-3 text-center">{item.quantity}</td>
+                            <td className="p-3 text-end fw-semibold">{formatCurrency(item.total)}</td>
+                          </tr>
+                        ));
+                      } else {
+                        // For transactions without items data
+                        return (
+                          <tr key={tx.id}>
+                            <td className="p-3">{i + 1}</td>
+                            <td className="p-3">
+                              <div className="d-flex align-items-center">
+                                <Badge bg={tx.type === 'got' ? 'success' : 'danger'} className="me-2">
+                                  {tx.type.toUpperCase()}
+                                </Badge>
+                                {tx.type === 'got' ? 'Payment Received' : 'Payment Made'}
+                              </div>
+                            </td>
+                            <td className="p-3 text-center">1</td>
+                            <td className="p-3 text-end fw-semibold">{formatCurrency(Number(tx.amount) || 0)}</td>
+                          </tr>
+                        );
+                      }
+                    }).flat()
                   )}
                 </tbody>
                 {transactions.length > 0 && (
@@ -313,7 +350,9 @@ export default function ReportsPage() {
                       <td className="p-3 text-end fw-semibold text-danger">–{formatCurrency(discountAmt)}</td>
                     </tr>
                     <tr className="border-top border-2">
-                      <td colSpan={3} className="p-3 text-end fw-bold h5 mb-0">Total Due:</td>
+                      <td colSpan={3} className="p-3 text-end fw-bold h5 mb-0">
+                        {transactionType === 'got' ? 'Total Got:' : transactionType === 'gave' ? 'Total Gave:' : 'Total:'}
+                      </td>
                       <td className="p-3 text-end fw-bold h5 mb-0 text-primary">{formatCurrency(total)}</td>
                     </tr>
                   </tfoot>

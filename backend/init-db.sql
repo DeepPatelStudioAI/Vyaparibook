@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS customers (
 CREATE TABLE IF NOT EXISTS invoices (
     id INT AUTO_INCREMENT PRIMARY KEY,
     customerId INT NOT NULL,
+    invoice_number INT UNIQUE,
     total DECIMAL(10, 2) DEFAULT 0.00,
     status ENUM('receivable', 'payable', 'settled') DEFAULT 'settled',
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -91,6 +92,17 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     unit_price DECIMAL(10, 2) NOT NULL,
     total_price DECIMAL(10, 2) NOT NULL,
     FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+);
+
+-- Transaction items table
+CREATE TABLE IF NOT EXISTS transaction_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    transaction_id INT NOT NULL,
+    product_name VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    price DECIMAL(10, 2) NOT NULL,
+    total DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
 );
 
 -- Insert a test user

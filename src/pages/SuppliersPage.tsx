@@ -144,7 +144,7 @@ export default function SuppliersPage() {
     if (!product) return;
     if (quantity > product.stockQuantity) return alert('Not enough stock available');
     
-    const price = transForm.type === 'got' ? product.costPrice : product.basePrice;
+    const price = transForm.type === 'got' ? product.costPrice : product.costPrice;
     const item: TransactionItem = {
       productId: product.id,
       productName: product.name,
@@ -171,10 +171,10 @@ export default function SuppliersPage() {
     const updatedProducts = currentProducts.map((product: Product) => {
       const item = items.find(i => i.productId === product.id);
       if (item) {
-        // For suppliers: 'got' means we received stock, 'gave' means we gave stock
-        const newStock = type === 'got' 
-          ? product.stockQuantity + item.quantity 
-          : product.stockQuantity - item.quantity;
+        // For suppliers: 'gave' means we gave products (decrease stock), 'got' means supplier returned (increase stock)
+        const newStock = type === 'gave' 
+          ? product.stockQuantity - item.quantity 
+          : product.stockQuantity + item.quantity;
         return { ...product, stockQuantity: Math.max(0, newStock) };
       }
       return product;
@@ -238,7 +238,7 @@ export default function SuppliersPage() {
     if (selected) fetchTransactions(selected.id);
   };
 
-  const totalReceivable = suppliers.reduce((sum, s) => sum + (s.status === 'receivable' ? s.balance : 0), 0);
+  const totalReceivable = suppliers.reduce((sum, s) => sum + (s.status === 'receivable' ? Math.abs(s.balance) : 0), 0);
   const totalPayable = suppliers.reduce((sum, s) => sum + (s.status === 'payable' ? s.balance : 0), 0);
 
   const filteredSuppliers = suppliers
@@ -375,14 +375,6 @@ export default function SuppliersPage() {
                       </div>
                     </div>
                     <div className="text-end">
-                      <Badge 
-                        bg={s.status === 'receivable' ? 'success' : 'warning'} 
-                        className="mb-2"
-                        style={{ borderRadius: '8px' }}
-                      >
-                        {s.status.toUpperCase()}
-                      </Badge>
-                      <div className="fw-bold">{formatINR(s.balance)}</div>
                       <ChevronRight className="text-muted" size={20} />
                     </div>
                   </div>
@@ -410,8 +402,6 @@ export default function SuppliersPage() {
                   </div>
                   <p><strong>Phone:</strong> {selected.phone}</p>
                   <p><strong>Email:</strong> {selected.email}</p>
-                  <p><strong>Balance:</strong> {formatINR(selected.balance)}</p>
-                  <p><strong>Status:</strong> <Badge bg={selected.status === 'receivable' ? 'success' : 'danger'}>{selected.status.toUpperCase()}</Badge></p>
                   <p><strong>Created:</strong> {new Date(selected.createdAt).toLocaleDateString()}</p>
                   
                   <hr />
@@ -436,33 +426,44 @@ export default function SuppliersPage() {
                           const gave = tx.type === 'gave' ? tx.amount : 0;
                           const got = tx.type === 'got' ? tx.amount : 0;
                           return (
-                            <tr key={tx.id}>
-                              <td>{new Date(tx.created_at).toLocaleDateString()}</td>
-                              <td className="text-danger text-end">{gave ? formatINR(gave) : '—'}</td>
-                              <td className="text-success text-end">{got ? formatINR(got) : '—'}</td>
-                              <td className="text-center">
-                                <Button
-                                  size="sm"
-                                  variant="outline-secondary"
-                                  onClick={() => {
-                                    setEditingTx(tx);
-                                    setTransForm({ ...transForm, type: tx.type, amount: tx.amount.toString() });
-                                    setShowEditModal(true);
-                                  }}
-                                >
-                                  <Edit3 size={14} />
-                                </Button>
-                              </td>
-                              <td className="text-center">
-                                <Button
-                                  size="sm"
-                                  variant="outline-danger"
-                                  onClick={() => handleDeleteTransaction(tx.id)}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </td>
-                            </tr>
+                            <React.Fragment key={tx.id}>
+                              <tr>
+                                <td>{new Date(tx.created_at).toLocaleDateString()}</td>
+                                <td className="text-danger text-end">{gave ? formatINR(gave) : '—'}</td>
+                                <td className="text-success text-end">{got ? formatINR(got) : '—'}</td>
+                                <td className="text-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline-secondary"
+                                    onClick={() => {
+                                      setEditingTx(tx);
+                                      setTransForm({ ...transForm, type: tx.type, amount: tx.amount.toString() });
+                                      setShowEditModal(true);
+                                    }}
+                                  >
+                                    <Edit3 size={14} />
+                                  </Button>
+                                </td>
+                                <td className="text-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline-danger"
+                                    onClick={() => handleDeleteTransaction(tx.id)}
+                                  >
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </td>
+                              </tr>
+                              {tx.items && tx.items.length > 0 && (
+                                <tr>
+                                  <td colSpan={5} className="p-2 bg-light">
+                                    <small className="text-muted">
+                                      <strong>Products:</strong> {tx.items.map(item => `${item.productName} (${item.quantity})`).join(', ')}
+                                    </small>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           );
                         })}
                       </tbody>

@@ -32,6 +32,15 @@ interface Transaction {
   amount: number
 }
 
+interface GroupedTransaction {
+  customerId: number
+  customerName: string
+  invoiceNumber: number | null
+  totalGot: number
+  totalGave: number
+  transactionCount: number
+}
+
 export default function TransactionsPage() {
   const [txs, setTxs] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
@@ -115,15 +124,38 @@ export default function TransactionsPage() {
     loadTransactions()
   }, [location.pathname])
 
-  const filtered = txs.filter((tx) => {
+  // Group transactions by customer
+  const groupedTxs = txs.reduce((acc, tx) => {
+    const key = `${tx.customerId}-${tx.customerName}`
+    if (!acc[key]) {
+      acc[key] = {
+        customerId: tx.customerId,
+        customerName: tx.customerName,
+        invoiceNumber: tx.invoiceNumber,
+        totalGot: 0,
+        totalGave: 0,
+        transactionCount: 0
+      }
+    }
+    if (tx.type === 'got') acc[key].totalGot += tx.amount
+    if (tx.type === 'gave') acc[key].totalGave += tx.amount
+    acc[key].transactionCount++
+    return acc
+  }, {})
+
+  const groupedArray = Object.values(groupedTxs)
+
+  const filtered = groupedArray.filter((tx) => {
     const txt = tx.customerName.toLowerCase().includes(search.toLowerCase())
-    const num = String(tx.invoiceNumber).includes(search)
-    const typeOk = typeFilter === 'all' || tx.type === typeFilter
+    const num = String(tx.invoiceNumber || '').includes(search)
+    const typeOk = typeFilter === 'all' || 
+      (typeFilter === 'got' && tx.totalGot > 0) || 
+      (typeFilter === 'gave' && tx.totalGave > 0)
     return (txt || num) && typeOk
   })
 
-  const totalGot = txs.filter(tx => tx.type === 'got').reduce((sum, tx) => sum + tx.amount, 0)
-  const totalGave = txs.filter(tx => tx.type === 'gave').reduce((sum, tx) => sum + tx.amount, 0)
+  const totalGot = groupedArray.reduce((sum, tx) => sum + tx.totalGot, 0)
+  const totalGave = groupedArray.reduce((sum, tx) => sum + tx.totalGave, 0)
   const netAmount = totalGot - totalGave
 
   if (loading) {
@@ -251,66 +283,85 @@ export default function TransactionsPage() {
                 <tr>
                   <th className="border-0 p-4 fw-bold">Customer</th>
                   <th className="border-0 p-4 fw-bold">Invoice #</th>
-                  <th className="border-0 p-4 fw-bold">Type</th>
-                  <th className="border-0 p-4 fw-bold text-end">Amount</th>
+                  <th className="border-0 p-4 fw-bold text-end text-success">You Got</th>
+                  <th className="border-0 p-4 fw-bold text-end text-danger">You Gave</th>
+                  <th className="border-0 p-4 fw-bold text-center">Transactions</th>
                   <th className="border-0 p-4 fw-bold text-center">Reports</th>
-                  <th className="border-0 p-4 fw-bold text-center">Delete</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((tx) => (
-                  <tr key={tx.id} style={{ transition: 'background-color 0.2s' }}>
-                    <td className="p-4">
-                      <div className="d-flex align-items-center">
-                        <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${
-                          tx.type === 'got' ? 'bg-success bg-opacity-10' : 'bg-danger bg-opacity-10'
-                        }`} style={{ width: '40px', height: '40px' }}>
-                          {tx.type === 'got' ? 
-                            <TrendingUp className="text-success" size={16} /> : 
-                            <Wallet className="text-danger" size={16} />
-                          }
+                {filtered.map((tx) => {
+                  const netAmount = tx.totalGot - tx.totalGave
+                  const isPositive = netAmount >= 0
+                  return (
+                    <tr key={`${tx.customerId}-${tx.customerName}`} style={{ transition: 'background-color 0.2s' }}>
+                      <td className="p-4">
+                        <div className="d-flex align-items-center">
+                          <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${
+                            isPositive ? 'bg-success bg-opacity-10' : 'bg-danger bg-opacity-10'
+                          }`} style={{ width: '40px', height: '40px' }}>
+                            <FileText className={isPositive ? 'text-success' : 'text-danger'} size={16} />
+                          </div>
+                          <div>
+                            <div className="fw-semibold">{tx.customerName}</div>
+                            <small className="text-muted">
+                              Net: <span className={isPositive ? 'text-success' : 'text-danger'}>
+                                ₹{Math.abs(netAmount).toFixed(2)}
+                              </span>
+                            </small>
+                          </div>
                         </div>
-                        <div className="fw-semibold">{tx.customerName}</div>
-                      </div>
-                    </td>
-                    <td className="p-4 text-muted">{tx.invoiceNumber ?? '—'}</td>
-                    <td className="p-4">
-                      <span
-                        className={`badge px-3 py-2 bg-${
-                          tx.type === 'got' ? 'success' : 'danger'
-                        }`}
-                        style={{ borderRadius: '8px' }}
-                      >
-                        {tx.type.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="p-4 text-end fw-bold">₹{tx.amount.toFixed(2)}</td>
-                    <td className="p-4 text-center">
-                      <Button
-                        size="sm"
-                        variant="outline-primary"
-                        onClick={() =>
-                          navigate(
-                            `/dashboard/reports?customerId=${tx.customerId}`
-                          )
-                        }
-                        style={{ borderRadius: '8px' }}
-                      >
-                        <FileText size={14} className="me-1" /> Report
-                      </Button>
-                    </td>
-                    <td className="p-4 text-center">
-                      <Button
-                        size="sm"
-                        variant="outline-danger"
-                        onClick={() => confirmDelete(tx.id)}
-                        style={{ borderRadius: '8px' }}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="p-4 text-muted">{tx.invoiceNumber ?? '—'}</td>
+                      <td className="p-4 text-end fw-bold text-success">
+                        {tx.totalGot > 0 ? `₹${tx.totalGot.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="p-4 text-end fw-bold text-danger">
+                        {tx.totalGave > 0 ? `₹${tx.totalGave.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="badge bg-info" style={{ borderRadius: '8px' }}>
+                          {tx.transactionCount}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="d-flex gap-1 justify-content-center">
+                          <Button
+                            size="sm"
+                            variant="outline-primary"
+                            onClick={() => navigate(`/dashboard/reports?customerId=${tx.customerId}`)}
+                            style={{ borderRadius: '6px' }}
+                            title="All Transactions"
+                          >
+                            All
+                          </Button>
+                          {tx.totalGot > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline-success"
+                              onClick={() => navigate(`/dashboard/reports?customerId=${tx.customerId}&type=got`)}
+                              style={{ borderRadius: '6px' }}
+                              title="You Got Report"
+                            >
+                              Got
+                            </Button>
+                          )}
+                          {tx.totalGave > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline-danger"
+                              onClick={() => navigate(`/dashboard/reports?customerId=${tx.customerId}&type=gave`)}
+                              style={{ borderRadius: '6px' }}
+                              title="You Gave Report"
+                            >
+                              Gave
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </Table>
           )}

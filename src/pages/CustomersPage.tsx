@@ -222,8 +222,8 @@ export default function CustomersPage() {
     const updatedProducts = currentProducts.map((product: Product) => {
       const item = items.find(i => i.productId === product.id);
       if (item) {
-        // For customers: 'got' means customer paid (we sold), 'gave' means we gave refund (stock returns)
-        const newStock = type === 'got' 
+        // For customers: 'gave' means we gave products (decrease stock), 'got' means customer returned (increase stock)
+        const newStock = type === 'gave' 
           ? product.stockQuantity - item.quantity 
           : product.stockQuantity + item.quantity;
         return { ...product, stockQuantity: Math.max(0, newStock) };
@@ -468,13 +468,6 @@ export default function CustomersPage() {
                       </div>
                     </div>
                     <div className="text-end">
-                      <Badge 
-                        bg={c.status === "receivable" ? "success" : "danger"} 
-                        className="mb-2"
-                        style={{ borderRadius: '8px' }}
-                      >
-                        {c.status.toUpperCase()}
-                      </Badge>
                       <ChevronRight className="text-muted" size={20} />
                     </div>
                   </div>
@@ -533,48 +526,59 @@ export default function CustomersPage() {
                           const gave = tx.type === "gave" ? tx.amount : 0;
                           const got = tx.type === "got" ? tx.amount : 0;
                           return (
-                            <tr key={tx.id}>
-                              <td>{new Date(tx.created_at).toLocaleDateString()}</td>
-                              <td className="text-danger text-end">{gave ? formatINR(gave) : "—"}</td>
-                              <td className="text-success text-end">{got ? formatINR(got) : "—"}</td>
-                              <td className="text-end">
-                                {tx.runningBalance != null ? formatINR(tx.runningBalance) : "—"}
-                              </td>
-                              <td className="text-center">
-                                <Button
-                                  size="sm"
-                                  variant="outline-primary"
-                                  onClick={() =>
-                                    navigate(`/dashboard/reports?customerId=${selected.id}`)
-                                  }
-                                >
-                                  <Download size={14} />
-                                </Button>
-                              </td>
-                              <td className="text-center">
-                                <Button
-                                  size="sm"
-                                  variant="outline-secondary"
-                                  onClick={() => {
-                                    setEditingTx(tx);
-                                    setTxType(tx.type);
-                                    setTxAmount(tx.amount);
-                                    setShowEditModal(true);
-                                  }}
-                                >
-                                  <Edit3 size={14} />
-                                </Button>
-                              </td>
-                              <td className="text-center">
-                                <Button
-                                  size="sm"
-                                  variant="outline-danger"
-                                  onClick={() => handleDeleteTransaction(tx.id)}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </td>
-                            </tr>
+                            <React.Fragment key={tx.id}>
+                              <tr>
+                                <td>{new Date(tx.created_at).toLocaleDateString()}</td>
+                                <td className="text-danger text-end">{gave ? formatINR(gave) : "—"}</td>
+                                <td className="text-success text-end">{got ? formatINR(got) : "—"}</td>
+                                <td className="text-end">
+                                  {tx.runningBalance != null ? formatINR(tx.runningBalance) : "—"}
+                                </td>
+                                <td className="text-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline-primary"
+                                    onClick={() =>
+                                      navigate(`/dashboard/reports?customerId=${selected.id}`)
+                                    }
+                                  >
+                                    <Download size={14} />
+                                  </Button>
+                                </td>
+                                <td className="text-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline-secondary"
+                                    onClick={() => {
+                                      setEditingTx(tx);
+                                      setTxType(tx.type);
+                                      setTxAmount(tx.amount);
+                                      setShowEditModal(true);
+                                    }}
+                                  >
+                                    <Edit3 size={14} />
+                                  </Button>
+                                </td>
+                                <td className="text-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline-danger"
+                                    onClick={() => handleDeleteTransaction(tx.id)}
+                                  >
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </td>
+                              </tr>
+                              {tx.items && tx.items.length > 0 && (
+                                <tr>
+                                  <td colSpan={7} className="p-2 bg-light">
+                                    <small className="text-muted">
+                                      <strong>Products:</strong> {tx.items.map(item => `${item.productName} (${item.quantity})`).join(', ')}
+                                    </small>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           );
                         })}
                       </tbody>
