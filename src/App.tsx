@@ -11,6 +11,7 @@ import CustomersPage from './pages/CustomersPage';
 import SuppliersPage from './pages/SuppliersPage';
 import InventoryPage from './pages/InventoryPage';
 import TransactionsPage from './pages/TransactionsPage';
+import SettingsPage from './pages/SettingsPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
               }
             />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Routes>

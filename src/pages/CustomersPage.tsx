@@ -344,28 +344,41 @@ export default function CustomersPage() {
   return (
     <div className="p-4">
       {/* Header */}
-      <div className="d-flex justify-content-between mb-4">
-        <h3 className="text-primary">Customers</h3>
-        <Button onClick={() => setShowCustModal(true)}>
-          <Plus className="me-2" /> Add Customer
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 className="text-primary fw-bold mb-1">Customers</h2>
+          <p className="text-muted mb-0">Manage your customer relationships</p>
+        </div>
+        <Button 
+          variant="primary" 
+          size="lg" 
+          onClick={() => setShowCustModal(true)}
+          className="shadow-sm"
+          style={{ borderRadius: '12px' }}
+        >
+          <Plus className="me-2" size={20} /> Add Customer
         </Button>
       </div>
 
       {/* Stats */}
       <Row className="mb-4 g-3">
         {[
-          { title: "Total Receivable", value: formatINR(totalReceivable), color: "success", icon: <TrendingUp /> },
-          { title: "Total Payable", value: formatINR(totalPayable), color: "danger", icon: <Wallet /> },
-          { title: "Total Customers", value: customers.length, color: "info", icon: <Users /> },
+          { title: "Total Receivable", value: formatINR(totalReceivable), color: "success", icon: <TrendingUp />, bg: "success" },
+          { title: "Total Payable", value: formatINR(totalPayable), color: "danger", icon: <Wallet />, bg: "danger" },
+          { title: "Total Customers", value: customers.length, color: "info", icon: <Users />, bg: "info" },
         ].map((st, i) => (
           <Col md={4} key={i}>
-            <Card className={`border-start border-4 border-${st.color}`}>
-              <Card.Body className="d-flex justify-content-between">
+            <Card className="h-100 shadow-sm border-0" style={{ borderRadius: '16px', transition: 'transform 0.2s', cursor: 'pointer' }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+              <Card.Body className="d-flex justify-content-between align-items-center p-4">
                 <div>
-                  <div className={`text-${st.color} small fw-bold`}>{st.title}</div>
-                  <h5 className="fw-bold">{st.value}</h5>
+                  <div className={`text-${st.color} text-uppercase small fw-bold mb-2 opacity-75`}>{st.title}</div>
+                  <h3 className="fw-bold mb-0">{st.value}</h3>
                 </div>
-                <div className="bg-light p-2 rounded">{st.icon}</div>
+                <div className={`bg-${st.bg} bg-opacity-10 p-3 rounded-circle`}>
+                  <div className={`text-${st.color}`}>{st.icon}</div>
+                </div>
               </Card.Body>
             </Card>
           </Col>
@@ -375,52 +388,106 @@ export default function CustomersPage() {
       <Row>
         {/* Customer List */}
         <Col md={6}>
-          <InputGroup className="mb-3">
-            <InputGroup.Text><Search /></InputGroup.Text>
-            <Form.Control
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Form.Select
-              style={{ maxWidth: 150 }}
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
-            >
-              <option value="all">All</option>
-              <option value="receivable">Receivable</option>
-              <option value="payable">Payable</option>
-            </Form.Select>
-          </InputGroup>
-          <Card>
-            <Card.Body style={{ maxHeight: "60vh", overflowY: "auto" }}>
-              {filtered.map((c) => (
-                <div
-                  key={c.id}
-                  className={`d-flex justify-content-between p-3 mb-2 border rounded ${
-                    selected?.id === c.id ? "bg-light border-primary" : ""
-                  }`}
-                  onClick={() => setSelected(c)}
-                  style={{ cursor: "pointer" }}
+          <div className="mb-4">
+            <Row className="g-3">
+              <Col md={8}>
+                <InputGroup size="lg" className="shadow-sm" style={{ borderRadius: '12px' }}>
+                  <InputGroup.Text className="bg-white border-end-0" style={{ borderRadius: '12px 0 0 12px' }}>
+                    <Search className="text-muted" size={20} />
+                  </InputGroup.Text>
+                  <Form.Control
+                    placeholder="Search customers..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="border-start-0 border-end-0"
+                    style={{ fontSize: '16px' }}
+                  />
+                </InputGroup>
+              </Col>
+              <Col md={4}>
+                <Form.Select
+                  size="lg"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value as any)}
+                  className="shadow-sm"
+                  style={{ borderRadius: '12px', fontSize: '16px' }}
                 >
-                  <div>
-                    <strong>{c.name}</strong>
-                    <br />
-                    <small className="text-muted">{c.phone}</small>
-                  </div>
-                  <Badge bg={c.status === "receivable" ? "success" : "danger"}>
-                    {c.status.toUpperCase()}
-                  </Badge>
+                  <option value="all">All Customers</option>
+                  <option value="receivable">Receivable</option>
+                  <option value="payable">Payable</option>
+                </Form.Select>
+              </Col>
+            </Row>
+          </div>
+          <Card className="shadow-sm border-0" style={{ borderRadius: '16px' }}>
+            <Card.Header className="bg-white border-0 p-4">
+              <h5 className="mb-0 fw-bold">Customer List</h5>
+            </Card.Header>
+            <Card.Body className="p-0" style={{ maxHeight: "65vh", overflowY: "auto" }}>
+              {filtered.length === 0 ? (
+                <div className="text-center py-5">
+                  <Users size={48} className="text-muted mb-3" />
+                  <p className="text-muted">No customers found</p>
                 </div>
-              ))}
+              ) : (
+                filtered.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`d-flex justify-content-between align-items-center p-4 border-bottom position-relative ${
+                      selected?.id === c.id ? "bg-primary bg-opacity-10 border-primary border-end-4" : ""
+                    }`}
+                    onClick={() => setSelected(c)}
+                    style={{ 
+                      cursor: "pointer", 
+                      transition: 'all 0.2s ease',
+                      borderLeft: selected?.id === c.id ? '4px solid var(--bs-primary)' : '4px solid transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selected?.id !== c.id) {
+                        e.currentTarget.style.backgroundColor = 'rgba(var(--bs-primary-rgb), 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selected?.id !== c.id) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <div className="d-flex align-items-center">
+                      <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${
+                        c.status === 'receivable' ? 'bg-success bg-opacity-10' : 'bg-danger bg-opacity-10'
+                      }`} style={{ width: '48px', height: '48px' }}>
+                        <Users className={c.status === 'receivable' ? 'text-success' : 'text-danger'} size={20} />
+                      </div>
+                      <div>
+                        <h6 className="mb-1 fw-bold">{c.name}</h6>
+                        <small className="text-muted d-flex align-items-center">
+                          <span className="me-2">{c.phone}</span>
+                          {c.email && <span>• {c.email}</span>}
+                        </small>
+                      </div>
+                    </div>
+                    <div className="text-end">
+                      <Badge 
+                        bg={c.status === "receivable" ? "success" : "danger"} 
+                        className="mb-2"
+                        style={{ borderRadius: '8px' }}
+                      >
+                        {c.status.toUpperCase()}
+                      </Badge>
+                      <ChevronRight className="text-muted" size={20} />
+                    </div>
+                  </div>
+                ))
+              )}
             </Card.Body>
           </Card>
         </Col>
 
         {/* Detail & Transactions */}
         <Col md={6}>
-          <Card className="h-100">
-            <Card.Body>
+          <Card className="h-100 shadow-sm border-0" style={{ borderRadius: '16px' }}>
+            <Card.Body className="p-4">
               {selected ? (
                 <>
                   {/* Customer Info + Actions */}

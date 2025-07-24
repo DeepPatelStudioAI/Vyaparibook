@@ -249,9 +249,18 @@ export default function SuppliersPage() {
   return (
     <div className="p-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h3 className="fw-bold text-primary">Suppliers</h3>
-        <Button variant="primary" onClick={() => setShowModal(true)}>
-          <Plus className="me-2" size={18} /> Add Supplier
+        <div>
+          <h2 className="text-primary fw-bold mb-1">Suppliers</h2>
+          <p className="text-muted mb-0">Manage your supplier relationships</p>
+        </div>
+        <Button 
+          variant="primary" 
+          size="lg" 
+          onClick={() => setShowModal(true)}
+          className="shadow-sm"
+          style={{ borderRadius: '12px' }}
+        >
+          <Plus className="me-2" size={20} /> Add Supplier
         </Button>
       </div>
 
@@ -264,60 +273,118 @@ export default function SuppliersPage() {
           title: 'Total Suppliers', value: suppliers.length, color: 'info', icon: <Truck />
         }].map((card, i) => (
           <Col md={4} key={i}>
-            <Card className={`border-start border-4 border-${card.color} shadow-sm`}>
-              <Card.Body className="d-flex justify-content-between align-items-center">
+            <Card className="h-100 shadow-sm border-0" style={{ borderRadius: '16px', transition: 'transform 0.2s', cursor: 'pointer' }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+              <Card.Body className="d-flex justify-content-between align-items-center p-4">
                 <div>
-                  <div className={`text-${card.color} text-uppercase small fw-bold mb-1`}>
+                  <div className={`text-${card.color} text-uppercase small fw-bold mb-2 opacity-75`}>
                     {card.title}
                   </div>
-                  <h5 className="fw-bold">{card.value}</h5>
+                  <h3 className="fw-bold mb-0">{card.value}</h3>
                 </div>
-                <div className="bg-light p-2 rounded">{card.icon}</div>
+                <div className={`bg-${card.color} bg-opacity-10 p-3 rounded-circle`}>
+                  <div className={`text-${card.color}`}>{card.icon}</div>
+                </div>
               </Card.Body>
             </Card>
           </Col>
         ))}
       </Row>
 
-      <div className="d-flex flex-wrap gap-3 align-items-center mb-4">
-        <InputGroup style={{ maxWidth: 300 }}>
-          <InputGroup.Text><Search size={16} /></InputGroup.Text>
-          <Form.Control
-            placeholder="Search by name"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
-        <Form.Select style={{ maxWidth: 200 }} value={filter} onChange={e => setFilter(e.target.value as any)}>
-          <option value="all">All</option>
-          <option value="receivable">Receivable</option>
-          <option value="payable">Payable</option>
-        </Form.Select>
+      <div className="mb-4">
+        <Row className="g-3">
+          <Col md={8}>
+            <InputGroup size="lg" className="shadow-sm" style={{ borderRadius: '12px' }}>
+              <InputGroup.Text className="bg-white border-end-0" style={{ borderRadius: '12px 0 0 12px' }}>
+                <Search className="text-muted" size={20} />
+              </InputGroup.Text>
+              <Form.Control
+                placeholder="Search suppliers..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="border-start-0 border-end-0"
+                style={{ fontSize: '16px' }}
+              />
+            </InputGroup>
+          </Col>
+          <Col md={4}>
+            <Form.Select
+              size="lg"
+              value={filter}
+              onChange={e => setFilter(e.target.value as any)}
+              className="shadow-sm"
+              style={{ borderRadius: '12px', fontSize: '16px' }}
+            >
+              <option value="all">All Suppliers</option>
+              <option value="receivable">Receivable</option>
+              <option value="payable">Payable</option>
+            </Form.Select>
+          </Col>
+        </Row>
       </div>
 
       <Row>
         <Col md={7}>
-          <Card className="shadow-sm">
-            <Card.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+          <Card className="shadow-sm border-0" style={{ borderRadius: '16px' }}>
+            <Card.Header className="bg-white border-0 p-4">
+              <h5 className="mb-0 fw-bold">Supplier List</h5>
+            </Card.Header>
+            <Card.Body className="p-0" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
               {filteredSuppliers.length === 0 ? (
-                <div className="text-muted text-center p-5">No suppliers found.</div>
+                <div className="text-center py-5">
+                  <Truck size={48} className="text-muted mb-3" />
+                  <p className="text-muted">No suppliers found</p>
+                </div>
               ) : (
                 filteredSuppliers.map(s => (
                   <div
                     key={s.id}
-                    className={`d-flex justify-content-between align-items-center p-3 rounded mb-2 border ${selected?.id === s.id ? 'bg-light border-primary' : ''}`}
+                    className={`d-flex justify-content-between align-items-center p-4 border-bottom position-relative ${
+                      selected?.id === s.id ? "bg-primary bg-opacity-10 border-primary border-end-4" : ""
+                    }`}
                     onClick={() => setSelected(s)}
-                    style={{ cursor: 'pointer' }}
+                    style={{ 
+                      cursor: 'pointer', 
+                      transition: 'all 0.2s ease',
+                      borderLeft: selected?.id === s.id ? '4px solid var(--bs-primary)' : '4px solid transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selected?.id !== s.id) {
+                        e.currentTarget.style.backgroundColor = 'rgba(var(--bs-primary-rgb), 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selected?.id !== s.id) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
                   >
-                    <div>
-                      <strong>{s.name}</strong><br />
-                      <small className="text-muted">{s.phone}</small>
+                    <div className="d-flex align-items-center">
+                      <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${
+                        s.status === 'receivable' ? 'bg-success bg-opacity-10' : 'bg-warning bg-opacity-10'
+                      }`} style={{ width: '48px', height: '48px' }}>
+                        <Truck className={s.status === 'receivable' ? 'text-success' : 'text-warning'} size={20} />
+                      </div>
+                      <div>
+                        <h6 className="mb-1 fw-bold">{s.name}</h6>
+                        <small className="text-muted d-flex align-items-center">
+                          <span className="me-2">{s.phone}</span>
+                          {s.email && <span>• {s.email}</span>}
+                        </small>
+                      </div>
                     </div>
                     <div className="text-end">
-                      <Badge bg={s.status === 'receivable' ? 'success' : 'danger'} className="mb-1">{s.status.toUpperCase()}</Badge><br />
-                      <span className="fw-semibold">{formatINR(s.balance)}</span>
+                      <Badge 
+                        bg={s.status === 'receivable' ? 'success' : 'warning'} 
+                        className="mb-2"
+                        style={{ borderRadius: '8px' }}
+                      >
+                        {s.status.toUpperCase()}
+                      </Badge>
+                      <div className="fw-bold">{formatINR(s.balance)}</div>
+                      <ChevronRight className="text-muted" size={20} />
                     </div>
-                    <ChevronRight size={18} className="ms-2 text-muted" />
                   </div>
                 ))
               )}
@@ -326,8 +393,8 @@ export default function SuppliersPage() {
         </Col>
 
         <Col md={5}>
-          <Card className="shadow-sm h-100">
-            <Card.Body>
+          <Card className="shadow-sm h-100 border-0" style={{ borderRadius: '16px' }}>
+            <Card.Body className="p-4">
               {selected ? (
                 <>
                   <div className="d-flex justify-content-between align-items-center mb-3">
