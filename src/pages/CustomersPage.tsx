@@ -328,10 +328,10 @@ export default function CustomersPage() {
 
   // --- Top‑level stats ---
   const totalReceivable = customers
-    .filter((c) => c.status === "receivable")
+    .filter((c) => c.status === "payable")
     .reduce((s, c) => s + Math.abs(c.balance), 0);
   const totalPayable = customers
-    .filter((c) => c.status === "payable")
+    .filter((c) => c.status === "receivable")
     .reduce((s, c) => s + Math.abs(c.balance), 0);
 
   // --- Filter & search customers ---
@@ -515,7 +515,7 @@ export default function CustomersPage() {
                           <th>Date</th>
                           <th className="text-danger text-end">You Gave</th>
                           <th className="text-success text-end">You Got</th>
-                          <th className="text-end">Balance</th>
+                          {/* <th className="text-end">Balance</th> */}
                           <th className="text-center">Report</th>
                           <th className="text-center">Edit</th>
                           <th className="text-center">Delete</th>
@@ -531,9 +531,9 @@ export default function CustomersPage() {
                                 <td>{new Date(tx.created_at).toLocaleDateString()}</td>
                                 <td className="text-danger text-end">{gave ? formatINR(gave) : "—"}</td>
                                 <td className="text-success text-end">{got ? formatINR(got) : "—"}</td>
-                                <td className="text-end">
+                                {/* <td className="text-end">
                                   {tx.runningBalance != null ? formatINR(tx.runningBalance) : "—"}
-                                </td>
+                                </td> */}
                                 <td className="text-center">
                                   <Button
                                     size="sm"
@@ -710,7 +710,18 @@ export default function CustomersPage() {
                       </Form.Select>
                     </Col>
                     <Col md={3}>
-                      <Form.Control type="number" min="1" value={quantity} onChange={e => setQuantity(parseInt(e.target.value) || 1)} placeholder="Qty" />
+                      <Form.Control 
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={quantity === 0 || quantity === '0' || quantity === '0.' ? '' : quantity}
+                        onChange={e => {
+                          const v = e.target.value.replace(/[^\d]/g, '');
+                          setQuantity(v === '' ? 0 : parseInt(v));
+                        }}
+                        placeholder="Qty"
+                        autoComplete="off"
+                      />
                     </Col>
                     <Col md={3}>
                       <Button variant="outline-primary" onClick={addTransactionItem} disabled={!selectedProduct}>Add</Button>
@@ -747,10 +758,16 @@ export default function CustomersPage() {
             <Form.Group>
               <Form.Label>{txType === 'got' ? 'Cash Amount' : 'Manual Amount (if no products)'}</Form.Label>
               <Form.Control
-                type="number"
-                value={txAmount}
-                onChange={(e) => setTxAmount(Number(e.target.value))}
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*"
+                value={txAmount === 0 || txAmount === 0.0 || txAmount === '0.' ? '' : txAmount}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^\d.]/g, '');
+                  setTxAmount(Number(v));
+                }}
                 disabled={txType === 'gave' && transItems.length > 0}
+                autoComplete="off"
               />
             </Form.Group>
           </Form>
@@ -785,9 +802,15 @@ export default function CustomersPage() {
             <Form.Group>
               <Form.Label>Amount</Form.Label>
               <Form.Control
-                type="number"
-                value={txAmount}
-                onChange={(e) => setTxAmount(Number(e.target.value))}
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*"
+                value={txAmount === 0 || txAmount === 0.0 || txAmount === '0.' ? '' : txAmount}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^\d.]/g, '');
+                  setTxAmount(Number(v));
+                }}
+                autoComplete="off"
               />
             </Form.Group>
           </Form>

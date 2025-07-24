@@ -33,15 +33,19 @@ async function recalcBalance(customerId) {
     if (r.type === 'got') got += parseFloat(r.amount);
   });
   const balance = got - gave;
-  const status =
-    balance > 0 ? 'receivable' :
-    balance < 0 ? 'payable' :
-    'settled';
+  let status = 'settled';
+  if (balance > 0) status = 'receivable';
+  else if (balance < 0) status = 'payable';
   await db.query(
     `UPDATE customers
      SET balance = ?, status = ?
      WHERE id = ?`,
     [balance, status, customerId]
+  );
+  // Optionally, update all invoices for this customer to match status
+  await db.query(
+    `UPDATE invoices SET status = ? WHERE customerId = ?`,
+    [status, customerId]
   );
 }
 

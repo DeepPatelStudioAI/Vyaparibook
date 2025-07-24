@@ -30,7 +30,7 @@ export default function ReportsPage() {
   const [selectedId, setSelectedId] = useState<number | ''>('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loadingTx, setLoadingTx] = useState(false);
-  const [gstPct, setGstPct] = useState(6);
+  const [gstPct, setGstPct] = useState('');
   const [discountPct, setDiscountPct] = useState(0);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>({
     businessName: 'VyapariBook',
@@ -91,7 +91,8 @@ export default function ReportsPage() {
   const invoiceNum = selectedId ? `INV-${selectedId}-${Date.now().toString().slice(-6)}` : undefined;
 
   const subtotal = transactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-  const gstAmt = subtotal * gstPct / 100;
+  const gstValue = gstPct === '' ? 0 : Number(gstPct);
+  const gstAmt = subtotal * gstValue / 100;
   const afterGst = subtotal + gstAmt;
   const discountAmt = afterGst * discountPct / 100;
   const total = afterGst - discountAmt;
@@ -184,10 +185,16 @@ export default function ReportsPage() {
                 </Form.Label>
                 <Form.Control
                   size="lg"
-                  type="number"
-                  value={gstPct}
-                  onChange={e => setGstPct(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*"
+                  value={gstPct === '' || gstPct === 0 || gstPct === '0' || gstPct === '0.' ? '' : gstPct}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^\d.]/g, '');
+                    setGstPct(v);
+                  }}
                   style={{ borderRadius: '12px' }}
+                  autoComplete="off"
                 />
               </Form.Group>
             </Col>
@@ -199,10 +206,16 @@ export default function ReportsPage() {
                 </Form.Label>
                 <Form.Control
                   size="lg"
-                  type="number"
-                  value={discountPct}
-                  onChange={e => setDiscountPct(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*"
+                  value={discountPct === 0 || discountPct === '0' || discountPct === '0.' ? '' : discountPct}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^\d.]/g, '');
+                    setDiscountPct(v === '' ? 0 : Number(v));
+                  }}
                   style={{ borderRadius: '12px' }}
+                  autoComplete="off"
                 />
               </Form.Group>
             </Col>

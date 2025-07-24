@@ -238,8 +238,8 @@ export default function SuppliersPage() {
     if (selected) fetchTransactions(selected.id);
   };
 
-  const totalReceivable = suppliers.reduce((sum, s) => sum + (s.status === 'receivable' ? Math.abs(s.balance) : 0), 0);
-  const totalPayable = suppliers.reduce((sum, s) => sum + (s.status === 'payable' ? s.balance : 0), 0);
+  const totalReceivable = suppliers.reduce((sum, s) => sum + (s.status === 'payable' ? Math.abs(s.balance) : 0), 0);
+  const totalPayable = suppliers.reduce((sum, s) => sum + (s.status === 'receivable' ? s.balance : 0), 0);
 
   const filteredSuppliers = suppliers
     .filter(s => filter === 'all' || s.status === filter)
@@ -534,7 +534,18 @@ export default function SuppliersPage() {
                       </Form.Select>
                     </Col>
                     <Col md={3}>
-                      <Form.Control type="number" min="1" value={quantity} onChange={e => setQuantity(parseInt(e.target.value) || 1)} placeholder="Qty" />
+                      <Form.Control 
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={quantity === 0 || quantity === '0' || quantity === '0.' ? '' : quantity}
+                        onChange={e => {
+                          const v = e.target.value.replace(/[^\d]/g, '');
+                          setQuantity(v === '' ? 0 : parseInt(v));
+                        }}
+                        placeholder="Qty"
+                        autoComplete="off"
+                      />
                     </Col>
                     <Col md={3}>
                       <Button variant="outline-primary" onClick={addTransactionItem} disabled={!selectedProduct}>Add</Button>
@@ -569,12 +580,18 @@ export default function SuppliersPage() {
             )}
             
             <Form.Group><Form.Label>{transForm.type === 'got' ? 'Cash Amount' : 'Manual Amount (if no products)'}</Form.Label>
-              <Form.Control type="text" value={transForm.amount} onChange={e => {
-                const v = e.target.value;
-                if (v === '' || /^\d*\.?\d*$/.test(v)) {
+              <Form.Control 
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*"
+                value={transForm.amount === '0' || transForm.amount === '0.' ? '' : transForm.amount}
+                onChange={e => {
+                  const v = e.target.value.replace(/[^\d.]/g, '');
                   setTransForm(prev => ({ ...prev, amount: v }));
-                }
-              }} disabled={transForm.type === 'gave' && transItems.length > 0} />
+                }} 
+                disabled={transForm.type === 'gave' && transItems.length > 0} 
+                autoComplete="off"
+              />
             </Form.Group>
           </Form>
         </Modal.Body>
@@ -602,13 +619,14 @@ export default function SuppliersPage() {
               <Form.Label>Amount</Form.Label>
               <Form.Control
                 type="text"
-                value={transForm.amount}
+                inputMode="decimal"
+                pattern="[0-9]*"
+                value={transForm.amount === '0' || transForm.amount === '0.' ? '' : transForm.amount}
                 onChange={e => {
-                  const v = e.target.value;
-                  if (v === '' || /^\d*\.?\d*$/.test(v)) {
-                    setTransForm(prev => ({ ...prev, amount: v }));
-                  }
+                  const v = e.target.value.replace(/[^\d.]/g, '');
+                  setTransForm(prev => ({ ...prev, amount: v }));
                 }}
+                autoComplete="off"
               />
             </Form.Group>
           </Form>

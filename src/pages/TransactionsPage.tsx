@@ -282,7 +282,7 @@ export default function TransactionsPage() {
               <thead className="bg-light">
                 <tr>
                   <th className="border-0 p-4 fw-bold">Customer</th>
-                  <th className="border-0 p-4 fw-bold">Invoice #</th>
+                  <th className="border-0 p-4 fw-bold">Customer ID</th>
                   <th className="border-0 p-4 fw-bold text-end text-success">You Got</th>
                   <th className="border-0 p-4 fw-bold text-end text-danger">You Gave</th>
                   <th className="border-0 p-4 fw-bold text-center">Transactions</th>
@@ -312,7 +312,7 @@ export default function TransactionsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 text-muted">{tx.invoiceNumber ?? '—'}</td>
+                  <td className="p-4 text-muted">{tx.invoiceNumber ?? '—'}</td>
                       <td className="p-4 text-end fw-bold text-success">
                         {tx.totalGot > 0 ? `₹${tx.totalGot.toFixed(2)}` : '—'}
                       </td>
