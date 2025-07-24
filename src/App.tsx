@@ -13,7 +13,7 @@ import InventoryPage from './pages/InventoryPage';
 import TransactionsPage from './pages/TransactionsPage';
 import SettingsPage from './pages/SettingsPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
-
+// added new page
 export default function App() {
   return (
     <AuthProvider>
